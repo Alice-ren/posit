@@ -10,17 +10,9 @@
   Whenever we have some pattern ABC, if we have one count of ABC then we correspondingly have one count of AB, BC and A_C.
   We may still store a separate pattern AB, however, because we have found counts of AB which are not part of the larger pattern ABC.
   In that case, the raw count for AB will represent the count of occurrences of AB&(~C).  Therefore when we want the total count of AB*, we must take the sum of the count for AB, and add in the counts for ABC, ABQ and any other superpattern.  So the raw count for AB will represent the counts of AB which were not part of *any* superpattern.
-  Now, we may also have an instance in the data where we have QABC and we have existing patterns QAB and ABC.  In that case we have one count of QAB, one count of ABC, and *negative* one counts of AB.  That seems confusing, but it is actually consistent- if we ask for the count of ABC, we get one, QAB, we get one, and if we ask for the count of *AB* we get one.  The only thing we cannot ask for the count of is the count of occurences of AB which were not part of either QAB or ABC.  We could add the ability to ask that question by storing negative and positive counts for AB separately.
-  Therefore, with the current storage scheme, the stored raw count of *any* pattern is essentially meaningless.  We can only ever ask the database for the count of ...**AB**..., that is, a certain pattern, with anything for the other values.  And the way we ask the database this question is by looking at the stored raw value and the stored raw values of any superpatterns.
+  The subdivide() function is not written yet, but when it is, we may do things like subdivide 1x"QABC" into 1x"QAB" and 1x"ABC".  In that case we would also want to generate or update the pattern "AB" with a negative count.  So if there were no previously existing examples of "AB" by itself we would have -1x"AB".  That seems wierd but it is consistent-because we add in the counts for superpatterns, if we ask for the count of ABC, we get one, QAB, we get one, and if we ask for the count of AB we get one (1+1-1).
 */
 
-/*
-  A word on the general processing strategy for finding pattern matches.
-  Because of the curse of dimensionality, there in general will not exist any efficient mechanism for finding matches in the database to only some target pattern.  Therefore, no matter what our target pattern is, we might as well find the distance between that and every other pattern.
-  Because of this fact, all the processing algorithms below are designed if possible to answer a whole set of questions at once - for example, list the most likely character at every point- so that the loops can be written to scan through the database exactly once.  If it was written in a more conceptually simple way, with functions to find the counts for one target occurrence for instance- then we would wind up scanning the whole database many times in the process of answering one question.  Scanning the database one time for any question we ask of it is a basic design goal, not an optimisation, so writing the simpler functions has been deliberately avoided.
-*/
-
-//model::model(const unsigned max_pattern_dt, const unsigned event_lb, const unsigned event_ub, const unsigned event_blocksize, const bool single_valued) {
 model::model(unsigned memory_constraint) {
   this->memory_constraint = memory_constraint;
   total_num_events = 0.0;
@@ -57,27 +49,7 @@ double model::prior_count(unsigned pattern_length, const event_bounds &p_bounds)
   return pow(prior_position_density, pattern_length)*PRIOR_INTERVAL;
 }
 
-void model::delete_pattern(const pattern& p) {
-  /*	auto p_patt = patterns.begin();
-	while(p_patt != patterns.end()) {
-	if(*p_patt == p) {
-	p_patt = patterns.erase(p_patt);
-	}
-	else {
-	p_patt->count += count_suboccurrences_matching_pattern(get_occurrence(p, 0), const pattern(*p_patt)); 
-	//FIXME: wrong, this can double count.  I feel like I solved this once upon a time.
-	p_patt++;
-	}
-	}*/
-}
-//ABC BCD ABCD
-//remove ABCD
-//want: 2xABC 2xBCD -1xBC
-//Should be able to do this through proper use of set_local_counts
-//Or, it might turn out to be a really nasty problem.  As you can see above maintaining the right counts could mean adding an extra pattern to the table.
-//Maybe, instead I should write a function subdivide_pattern.  Then the two subs are clear, and either they exist, or they don't.  We just set the local counts to be equal to the parent.
-
-void model::subdivide_pattern(list<pattern>::iterator p_patt) {
+void model::subdivide_pattern(pattern* p, unsigned split_point) {
   //later
 }
 
@@ -89,16 +61,16 @@ void model::subdivide_pattern(list<pattern>::iterator p_patt) {
   Maybe there is some more elegant way of choosing thresholds for "old" and "large".
 */
 void model::train(const occurrence &givens) {
+  static occurrence prev_givens; //state variablee - last set of givens, so we can determine which are new
   occurrence dup_givens = get_intersection(prev_givens, givens);
   add_pattern(get_pattern(givens), 1.0);
   add_pattern(get_pattern(dup_givens), -1.0); //So that we don't double count
   prev_givens = givens;
 }
 
-/*
-  FIXME: there still might be a case I'm not getting here- if we return two chains ABC_Q and XBC_Q with Q being the new event, the get_matches function never returns BC_Q and therefore we don't get the chance to consider BC_Q as a separate match (and with 2 counts it might be a more relevant match)
+/* TO DO: this no longer compiles
+   Also, we now want to revert to computing via the method of multiplied conditionally independent probabilities.
 */
-
 void model::get_first_order_completions(const context& cxt, list<completion> &completions) const {
   if(cxt.type == NORMAL) {
     //Perform a match against every pattern in the database.  Stupid, but easy to write.

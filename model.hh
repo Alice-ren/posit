@@ -21,7 +21,7 @@ using namespace std;
 /*
   The model consists of a first order mapping of a current state onto a number of future states, along with a probability of each.
   The critical assumption here is that the probability of any sequence of events is time shift independent - constant with respect to time.
-  In the case of image processing or other applications the probability of sequences of events might be independent with respect to both the horizontal and vertical axis of the image, giving essentially 2 time coordinates.
+  In the case of image processing or other applications the probability of sequences of events might be independent with respect to both the horizontal and vertical axis of the image, giving essentially 2 "time" coordinates.
 */
 
 /*
@@ -47,10 +47,10 @@ class model {
   void update_base_case(const pattern &p, double count);
   double prior_count(unsigned pattern_length) const; //Assume an even prior distribution of events and patterns
   void delete_pattern(pattern* p); //distributes counts downwards to subpatterns so that total_num_events is unchanged
-
+  void subdivide_pattern(pattern* p, unsigned split_point);
+  
   list<pattern> patterns; //Our corpus of data
   unsigned memory_constraint;
-  occurrence prev_givens; //last set of givens, so we can determine which are new
   double total_num_events;
   map<unsigned, double> base_case;
 };

@@ -30,9 +30,9 @@ private:
   void flush_bits();
   //State variables.
   bitfield_reader field;
-  double ub;
-  double lb;
-  double d;
+  double ub; //upper bound
+  double lb; //lower bound
+  double d;  //number representing our data
 };
 
 class arithmetic_writer {
@@ -44,8 +44,8 @@ private:
   void flush_bits();
   //State variables.
   bitfield_writer field;
-  double ub;
-  double lb;
+  double ub; //upper bound
+  double lb; //lower bound
   unsigned carry_bits;
 };
 

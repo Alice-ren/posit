@@ -1,5 +1,5 @@
 /*****
-      pattern.h
+      pattern.hh
       Defines probability spaces over events and sets of events
 ******/
 
@@ -13,12 +13,15 @@ using namespace std;
 #ifndef PATTERN
 #define PATTERN
 
-//A pattern is an abstraction generated from one or more occurrences with matching *absolute* positions, wrt the *relative* time between events in those occurrences.
-//In this system our organizing principle is that sequences of events repeat with respect to time and that the probability of an event depends on
-//how many similar sequences we have seen before per unit time.
-//The probability of seeing a particular pattern at some point in time depends on whether there are events in the space which match elements of the pattern.
-//But the probability is assumed to be *conditionally independent* of any events that do not match the pattern.  This assumption allows us to chain together 
-//overlapping patterns to make extended inferences.
+/*
+  A pattern is an abstraction generated from one or more occurrences with matching *absolute* positions, wrt the *relative* time between events in those occurrences.
+  In this system our organizing principle is that sequences of events repeat with respect to time and that the probability of an event depends on
+  how many similar sequences we have seen before per unit time.
+  The probability of seeing a particular pattern at some point in time depends on whether there are events in the space which match elements of the pattern.
+  But the probability is assumed to be *conditionally independent* of any events that do not match the pattern.  This assumption allows us to chain together 
+  overlapping patterns to make extended inferences.
+*/
+
 typedef struct {
   vector<unsigned> p;
   vector<unsigned> dt;
