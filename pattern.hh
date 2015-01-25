@@ -7,7 +7,7 @@
 #include <list>
 #include <iostream>
 #include <climits>
-#include "occurrence.h"
+#include "occurrence.hh"
 using namespace std;
 
 #ifndef PATTERN

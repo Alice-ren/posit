@@ -3,7 +3,7 @@
       Defines probability spaces over events and sets of events
 ******/
 
-#include "model.h"
+#include "model.hh"
 
 /*
   A word on the storage strategy of patterns.
@@ -31,14 +31,14 @@ void model::add_sample(pattern* p, double count) {
   update_base_case(*p, count);
 }
  
-void model::add_pattern(const pattern &p, double count) {
+void model::add_pattern(pattern p, double count) {
   p.count = count;
   patterns.push_back(p);
   update_base_case(p, count);
 }
 
 void model::update_base_case(const pattern &p, double count) {
-  for(auto p_iter = p.p.begin();p_iter != p.p.end;p_iter++) {
+  for(vector<unsigned>::const_iterator p_iter = p.p.begin();p_iter != p.p.end();p_iter++) {
     base_case[*p_iter] += count;
   }
 }
@@ -72,6 +72,8 @@ void model::train(const occurrence &givens) {
    Also, we now want to revert to computing via the method of multiplied conditionally independent probabilities.
 */
 void model::get_first_order_completions(const context& cxt, list<completion> &completions) const {
+
+#if 0
   if(cxt.type == NORMAL) {
     //Perform a match against every pattern in the database.  Stupid, but easy to write.
     list<match> raw_matches;
@@ -195,6 +197,7 @@ void model::get_first_order_completions(const context& cxt, list<completion> &co
     complement_cmp.prob *= (1.0 - p_comp->prob);
   }
   completions.push_back(complement_cmp);
+#endif
 }
 
 

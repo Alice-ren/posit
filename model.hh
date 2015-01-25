@@ -3,10 +3,11 @@
       Defines probability model over events and sets of events
 ******/
 
-#include "occurrence.h"
-#include "pattern.h"
+#include "occurrence.hh"
+#include "pattern.hh"
 #include <vector>
 #include <list>
+#include <map>
 #include <iostream>
 #include <algorithm>
 #include <math.h>
@@ -45,7 +46,7 @@ class model {
   void add_pattern(pattern p, double count);
   void add_sample(pattern* p, double count);
   void update_base_case(const pattern &p, double count);
-  double prior_count(unsigned pattern_length) const; //Assume an even prior distribution of events and patterns
+  double prior_count(unsigned pattern_length, const event_bounds &p_bounds) const; //Assume an even prior distribution of events and patterns
   void delete_pattern(pattern* p); //distributes counts downwards to subpatterns so that total_num_events is unchanged
   void subdivide_pattern(pattern* p, unsigned split_point);
   

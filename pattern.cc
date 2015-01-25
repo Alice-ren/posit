@@ -3,7 +3,7 @@
       Defines patterns and occurrences and operations on the two
 ******/
 
-#include "pattern.h"
+#include "pattern.hh"
 
 //pattern related functions
 void print_pattern(const pattern& p) {

@@ -5,6 +5,7 @@
 
 #include <list>
 #include <vector>
+#include <iostream>
 
 using namespace std;
 
@@ -24,6 +25,12 @@ typedef struct {
   unsigned lb; //lower bound
 } event_bounds;
 
+//Comparison operators over events - sort by time first then position.  Events can be placed in a unique order.
+bool operator<(const event& t1, const event& t2);
+bool operator==(const event& t1, const event& t2);
+bool operator!=(const event& t1, const event& t2);
+void print_event(const event& e);
+
 //A completion is an event combined with the probability of that event (in some context)
 typedef struct {
   event e;
@@ -32,19 +39,6 @@ typedef struct {
 } completion;
 
 bool compare_quality(const completion& c1, const completion& c2);
-
-//A context is a set of assumptions we are making about surrounding events.
-typedef struct {
-  occurrence givens;  //We are assuming that these events have occurred
-  occurrence exclusions; //We are assuming that these events have not occurred
-  event_bounds p_bounds; //upper and lower bound on position
-  event_bounds t_bountds; //upper and lower bound on time
-} context;
-
-bool operator<(const event& t1, const event& t2);
-bool operator==(const event& t1, const event& t2);
-bool operator!=(const event& t1, const event& t2);
-void print_event(const event& e);
 
 //An occurrence is a set of events, each represented with respect to absolute time
 typedef vector<event> occurrence;
@@ -58,5 +52,13 @@ occurrence get_union(const occurrence& occ1, const occurrence& occ2);
 bool is_single_valued(const occurrence& occ);  //with respect to time
 bool operator==(const occurrence& t1, const occurrence& t2);
 occurrence get_occurrence(const event& e);
+
+//A context is a set of assumptions we are making about surrounding events.
+typedef struct {
+  occurrence givens;  //We are assuming that these events have occurred
+  occurrence exclusions; //We are assuming that these events have not occurred
+  event_bounds p_bounds; //upper and lower bound on position
+  event_bounds t_bountds; //upper and lower bound on time
+} context;
 
 #endif

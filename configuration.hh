@@ -5,6 +5,8 @@
 
 #include "occurrence.hh"
 #include <list>
+#include <iostream>
+#include <iomanip>
 
 using namespace std;
 
@@ -23,6 +25,8 @@ using namespace std;
   To Do: try to figure out how I can make this cleaner / more obvious.
 */
 
+class config_node;
+
 class configuration {
 public:
   occurrence given;
@@ -35,13 +39,13 @@ public:
   bool expanded() const;
   void expand(const completion& cmp);
   void print(unsigned tab_layers = 0) const;
-  void enumerate_subconfigs(const list<configuration> &subconfigs) const;
+  void enumerate_subconfigs(list<configuration> &subconfigs) const;
   configuration highest_quality_subconfig(configuration current_best = configuration()) const;
   //Free memory from the heap.  Assuming no aliasing here.  If we are in the habit of making copies of configurations.. this becomes dangerous.
   //To Do: write copy constructor, destructor, etc.  The way I did this is kind of wacky.
   void free_subs();
 private:
-  config_node node;
+  config_node *node;
 };
 
 

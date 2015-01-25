@@ -3,7 +3,7 @@
       event class, occurrence class (typedef'd list of events) and some helper functions.
 ******/
 
-#include "occurrence.h"
+#include "occurrence.hh"
 
 //completion related functions
 bool compare_quality(const completion& c1, const completion& c2) {
