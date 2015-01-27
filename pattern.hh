@@ -38,7 +38,7 @@ pattern get_pattern(const occurrence& occ);
 
 //functions related to matches
 typedef struct {
-  pattern* p_patt;
+  //pattern* p_patt;
   occurrence patt_occ;  //The whole matched pattern, as an occurrence
   occurrence match_occ; //Matched portion of patt_occ
   event e;

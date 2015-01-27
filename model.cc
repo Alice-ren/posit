@@ -68,11 +68,59 @@ void model::train(const occurrence &givens) {
   prev_givens = givens;
 }
 
+//Returns the size of the sample space containing p
+double model::sample_size(const pattern& p) {
+
+}
+
 /* TO DO: this no longer compiles
    Also, we now want to revert to computing via the method of multiplied conditionally independent probabilities.
 */
 void model::get_first_order_completions(const context& cxt, list<completion> &completions) const {
+  //Find all matches to the context which contain at least one event not in context.occ
+  //Call this set of matches strict_matches.
+  list<match> strict_matches;
+  for(list<pattern>::const_iterator p_patt = patterns.begin();p_patt != patterns.end();p_patt++)
+    get_occurrence_matches(cxt.occ, *p_patt, strict_matches);
+    
+  //Take union(strict_matches) strict_matches_occ.
+  //Now strict_matches_occ - context.occ = new_events_occ, which is the union of the set of possible predicted events
+  //Now every match to an event in new_events_occ is a subset of strict_matches_occ
 
+  //However, strict_matches is not complete in the sense that to find the global count of every element
+  //of strict_matches, we need to find all the matches to strict_matches_occ.  Call it complete_matches.
+
+  //Now for each event e in new_events_occ, find all the matches to it from the set of strict_matches.
+  //Call it event_strict_matches[e].
+
+  //Now use the recursive algorithm to cross every element of event_strict_matches[e] with each other recursively to
+  //obtain the set of match_terms for e.  Generate a list sub_matches by taking the union of every
+  //element of match terms for every e.  Generate a list of match_terms[e] for every e which points to
+  //an element of sub_matches[i]
+
+  //For each element of sub_matches, find the global count by referencing to complete_matches.
+
+  //For each match in sub_matches, find the size of the sample space.  Divide the global count
+  //by the size of the sample space to obtain sub_matches[i].prob
+
+  //Multiply the terms in match_terms[e] together to obtain prob[e].  Use prob[e] to populate completions[e].
+
+  /*
+    Question we are asking: what is the probability of getting pattern p at this location in time?
+    We assume that that probability is the same as the frequency of p in historical data, which is count(p)/(size(H) - size(p))
+    Now let's say that we split H into H1 and H2.  Now, really, the true probability of p is the same as it was before.
+    But when we divided H into H1 and H2, there is a chance that we destroyed a sample of p, which would reduce the count.
+    Therefore our formula for P(p) is now slightly wrong.
+    But let's say we detected the loss of p, and we introduced a new pattern p to make up for the loss.  Then of course, to
+    make the counts add up correctly, we introduced negative counts for the overlap of (p,H1) and (p,H2).  Then our calculated
+    P(p) would still be correct.  Doing this for *all* such patterns might be tricky.  Maybe, I can always divide a pattern
+    into 2 patterns which each have one event the other doesn't, then a third with the intersection.  Of course there are n(n-1) ways
+    to do that, where n is the number of events in the pattern.
+    
+    The other option would be to adjust the sample space size for all patterns of size p, such that 
+   */
+
+  
 #if 0
   if(cxt.type == NORMAL) {
     //Perform a match against every pattern in the database.  Stupid, but easy to write.
