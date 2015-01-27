@@ -116,9 +116,30 @@ void model::get_first_order_completions(const context& cxt, list<completion> &co
     P(p) would still be correct.  Doing this for *all* such patterns might be tricky.  Maybe, I can always divide a pattern
     into 2 patterns which each have one event the other doesn't, then a third with the intersection.  Of course there are n(n-1) ways
     to do that, where n is the number of events in the pattern.
+
+    The other question is, what happens when we blow away a pattern but then we find another example such that if we had
+    kept the first one, we would have realized the pattern was important?  In other words the above handles *accidental* deletion
+    of a pattern, but what about *intentional* deletion.  Well, in that case, we will never ask for the count, we will multiply
+    two subpatterns to get it.
+
+    Another case is, we create a new pattern at some time step after the beginning, but the pattern has never occurred before.
+    In that situation the sample space would be unaffected.
     
-    The other option would be to adjust the sample space size for all patterns of size p, such that 
-   */
+    Another situation is, we subdivide a pattern at one point having found it to be a combination of two subs, but then we
+    recreate it later.  In that situation the count would be wrong.  We can make a guess though as to the true prior
+    count by multiplication.
+    
+    The idea occurs that perhaps this is the wrong way to store patterns- because what I am really doing is a sort of awkward
+    form of lossy data compression.  But, arithmetic coding allows you to encode the pattern given the probability; I want 
+    to encode the probability given the pattern, for patterns with the highest probability.
+    
+    But of course we could generate a tree, from the bottom up, starting with A,B,C,D then recording tuples of AB, AC, BD
+    wherever they are not c.i., and so on.  So maybe I could have a list of bottom-level and top-level patterns, or maybe
+    a pattern tree, although of course it would only be for matching faster since counts would not add up.  Also it
+    would make finding global counts much faster.
+
+    But with or without a tree, we can still construct the following functions: 
+  */
 
   
 #if 0

@@ -47,7 +47,6 @@ class model {
   void add_sample(pattern* p, double count);
   void update_base_case(const pattern &p, double count);
   double prior_count(unsigned pattern_length, const event_bounds &p_bounds) const; //Assume an even prior distribution of events and patterns
-  void delete_pattern(pattern* p); //distributes counts downwards to subpatterns so that total_num_events is unchanged
   void subdivide_pattern(pattern* p, unsigned split_point);  //Wrong - patterns can be subdivided arbitrarily not just into two contiguous pieces
   double sample_size(const pattern& p);
   
