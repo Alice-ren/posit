@@ -75,20 +75,43 @@ double model::sample_size(const pattern& p) {
 
 /* TO DO: this no longer compiles
    Also, we now want to revert to computing via the method of multiplied conditionally independent probabilities.
+
+   TO DO: Create a new completions object which has an iterator of some kind so that we can run a simple loop
+   through all the possible next events - including the ones which are just heat bath events.
 */
 void model::get_first_order_completions(const context& cxt, list<completion> &completions) const {
-  //Find all matches to the context which contain at least one event not in context.occ
+  //Find all matches to the context which contain at least one event not in ctx.occ
   //Call this set of matches strict_matches.
-  list<match> strict_matches;
-  for(list<pattern>::const_iterator p_patt = patterns.begin();p_patt != patterns.end();p_patt++)
-    get_occurrence_matches(cxt.occ, *p_patt, strict_matches);
-    
-  //Take union(strict_matches) strict_matches_occ.
-  //Now strict_matches_occ - context.occ = new_events_occ, which is the union of the set of possible predicted events
-  //Now every match to an event in new_events_occ is a subset of strict_matches_occ
 
+  //Find all matches to the context.
+  list<match> all_matches;
+  for(list<pattern>::const_iterator p_patt = patterns.begin();p_patt != patterns.end();p_patt++)
+    get_occurrence_matches(cxt.occ, *p_patt, all_matches);
+
+  //Create a second set with only matches which contain at least one event not in ctx.occ
+  //Call this strict_matches.
+  list<match> strict_matches;
+  for(auto p_match = all_matches.begin();p_match != all_matches.end();p_match++) {
+    if(!is_sub_occurrence(ctx.occ, p_match->match_occ))
+      strict_matches.push_back(*p_match);
+  }
+    
+  //Take union(strict_matches.match_occ) = strict_matches_occ.
+  occ strict_matches_occ;
+  for(auto p_match = strict_matches.begin();p_match != strict_matches.end();p_match++)
+    strict_matches_occ = get_union(strict_matches_occ, p_match->match_occ);
+  
+  //Now strict_matches_occ - context.occ = new_events_occ, which is the union of the set of possible predicted events
+  //Every match to an event in new_events_occ is a subset of strict_matches_occ
+  occ new_events_occ = subtract(strict_matches_occ, ctx.occ);
+  
   //However, strict_matches is not complete in the sense that to find the global count of every element
-  //of strict_matches, we need to find all the matches to strict_matches_occ.  Call it complete_matches.
+  //of strict_matches, we need every match that overlaps with strict_matches_occ.  Call it complete_matches.
+  list<match> complete_matches;
+  for(auto p_match = all_matches.begin();p_match != all_matches.end();p_match++) {
+    if(get_intersection(p_match->match_occ, strict_matches_occ).size() != 0)
+      complete_matches.push_back(*p_match);
+  }
 
   //Now for each event e in new_events_occ, find all the matches to it from the set of strict_matches.
   //Call it event_strict_matches[e].

@@ -98,7 +98,7 @@ double count_suboccurrences_matching_pattern(const occurrence &occ, const patter
   return count;
 }
 
-//Helper function for get_matches
+//Helper function for get_occurrence_matches
 //Return the minimum dt we can add to an the elements of occ1 such that at least one event matches exactly.
 //Does not return dt=0
 int min_dt(const occurrence& occ1, const occurrence& occ2) {
@@ -120,16 +120,26 @@ int min_dt(const occurrence& occ1, const occurrence& occ2) {
   return min_dt;
 }
 
-//This returns the matching part of the occurrence and the pattern for every way the occurrence can match the pattern
-//This function does not set *all* the elements of match; for instance:
-//We do not assume that patt is a pattern from the database, it could be arbitrary, therefore we don't set the match pattern pointer.
-//We do not know the global count at this point.
-//We do not know the probability at this point.
-bool get_occurrence_matches(
-			    const occurrence &occ, //the occurrence we are searching over
-			    const pattern &patt, //the pattern to search for.  Remember that patterns implicitly include all their subpatterns.
-			    list<match> &matches, //the output - a list of matches
-			    bool get_submatches) //for any matching occurrence, include all suboccurrences (which must also match)
+/*
+  This returns the matching part of the occurrence and the pattern for every way the occurrence can match the pattern
+  This function does not set *all* the elements of match; for instance:
+  We do not know the global count at this point.
+  We do not know the probability at this point.
+  
+  Note that this function does not return matches for patterns where part of the pattern contradicts the context.
+  Here is why: If we are searching for P(A) in the context of A_Q, and we have patterns ABQ, ACQ, ABC, AB
+  Then P(A) = P(ABQ) + P(ACQ) + P(ABC)
+  But, in context, P(ABC) == 0.
+  Less obviously, P(AB) == 0 also.  Remember that P(AB) means P(AB & ~ABC & ~ABQ..).  Because of that edge case,
+  the calling function to this one should encode (~ABC and ~ABQ) into the exclusions for the context.  If no pattern
+  ABQ existed, then P(AB) would not be zero.
+  So we only need the counts of ABQ and ACQ to find this probability.
+  Now this function only returns results for patterns we know directly - it does not handle patterns that we compose
+  out of smaller patterns.
+ */
+bool get_occurrence_matches(const context &ctx, //the context we are searching over
+			    const pattern &patt, //the pattern to search for.
+			    list<match> &matches) //the output - a list of matches
 {
   //Assume: the elements of occ are sorted by time.
   if(occ.empty() || patt.p.empty()) {std::cout << "occurrence or pattern is empty in get_matching_occurrences...\n"; return false; }
@@ -144,17 +154,12 @@ bool get_occurrence_matches(
     occurrence common_occ = get_intersection(occ, patt_occ);
     if(!common_occ.empty()) {
       match m;
-      m.p_patt = NULL; //This must be supplied externally; the given pattern may be a reference to a temporary
       m.patt_occ = patt_occ;
       m.match_occ = common_occ;
       m.local_count = patt.count;
       m.match_global_count = 0;
       m.patt_global_count = 0;
       matches.push_back(m);
-
-      //Get the submatches too.
-      if(get_submatches && !(common_occ == occ))
-	get_occurrence_matches(common_occ, get_pattern(common_occ), matches, true); //FIXME: huh?  why would this work.
 
       found_matches = true;
     }

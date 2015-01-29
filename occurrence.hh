@@ -55,10 +55,12 @@ occurrence get_occurrence(const event& e);
 
 //A context is a set of assumptions we are making about surrounding events.
 typedef struct {
-  occurrence givens;  //We are assuming that these events have occurred
-  occurrence exclusions; //We are assuming that these events have not occurred
-  event_bounds p_bounds; //upper and lower bound on position
-  event_bounds t_bountds; //upper and lower bound on time
+  occurrence givens;      //We are assuming that these events have occurred
+  occurrence exclusions;  //We are assuming that these events have not occurred
+  event_bounds p_bounds;  //upper and lower bound on position
+  event_bounds t_bounds;  //upper and lower bound on time
+  bool single_valued;     //true if we are only allowed one event at each moment in time.
+                          //FIXME: replace with a more generalized constraint; only two events, or one event of each of these 2 types, etc.
 } context;
 
 #endif
