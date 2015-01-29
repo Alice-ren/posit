@@ -30,11 +30,23 @@ using namespace std;
   i.e. P(ABC) = P(AB)P(BC)/P(B)
 */
 
+class pattern;
+typedef struct {
+  pattern* p_patt;
+  unsigned sub_pattern_t_offset;
+} patt_link;
+
 typedef struct {
   vector<unsigned> p;
   vector<unsigned> dt;
   double count;
+  double total_events_at_creation;
+
+  //sub, super patterns
+  vector<patt_link> super_patterns;
+  vector<patt_link> sub_patterns;
 } pattern;
+
 
 void print_pattern(const pattern& p);
 void print_patterns(const list<pattern>& patterns);
@@ -60,12 +72,14 @@ typedef struct {
 void print_match(const match& match);
 void print_matches(const list<match>& matches);
 
+void get_pattern_matches(const occurrence& occ, const pattern& patt, list<patt_link>& matches);
 bool get_suboccurrences_matching_pattern(const occurrence &occ, const pattern &patt, list<occurrence> &matches);
 double count_suboccurrences_matching_pattern(const occurrence &occ, const pattern &patt);
 bool get_occurrence_matches(const occurrence &occ, const pattern &patt, list<match> &matches); //Get all the matches
 void set_global_counts(list<match> &matches); //Sets the global count of each match given that we know the local counts
 void set_local_counts(list<match> &matches, occurrence oracle_occ); //sets the local count of each match given some occurrence to use to measure the global count
 void make_unique(list<match> &matches); //Eliminate duplicate pattern occurrences from this list of matches
+void make_unique(list<patt_link> &matches); //Eliminate duplicate pattern occurrences from this list of matches
 void consolidate(list<match> &matches); //Eliminate duplicate pattern occurrences from this list of matches, and sum counts
 bool match_occurrence_size_descending(const match& m1, const match& m2);
 bool match_occurrence_size_ascending(const match& m1, const match& m2);
