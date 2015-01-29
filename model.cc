@@ -70,7 +70,44 @@ void model::train(const occurrence &givens) {
 
 //Returns the size of the sample space containing p
 double model::sample_size(const pattern& p) {
+  return total_num_events - p.total_events_at_creation + 1.0;  //might be wrong - time based not event based?
+}
 
+double model::local_prob(const context& cxt, const pattern& p, unsigned t_abs) const {
+  occurrence patt_occ - get_occurrence(p, t_abs);
+  if(get_intersection(cxt.exclude, patt_occ).empty() && (!cxt.single_valued || is_single_valued(get_union(cxt.given, patt_occ)))) {
+    return p.count/sample_size(p);
+  }
+  else
+    return 0.0;
+}
+
+double model::global_prob(const context& cxt, const pattern& p, unsigned t_abs) const {
+  double lp = local_prob(cxt, p, t_abs);
+  double gp = 0.0;
+  if(lp != 0.0) {
+    for(vector<patt_link>::const_iterator p_super = p.super_patterns.begin();p_super != p.super_patterns.end();p_super++) {
+      gp += global_prob(cxt, *(p_super->p_patt), t_abs - p_super->sub_pattern_t_offset);
+    }
+  }
+
+  return gp;
+}
+
+double model::prob(const context& cxt, const occurrence& occ) const {
+  //Assume: P(X|G1 & G2 &...) = P(X|G1)P(X|G2)P(X|Gn)/P(X|G1^G2)..P(X)^m
+  //Constraint is that each event occurs net one time
+  //To Do:  Prove the above
+
+  list<patt_link> terms;
+  //Start with the base level
+  for(vector<pattern>::const_iterator p_patt = base_level_patterns.begin();p_patt != base_level_patterns.end();p_patt++) {
+    get_pattern_matches(occ, *p_patt, terms);
+  }
+
+  list<
+  make_unique(terms);
+  
 }
 
 /* TO DO: this no longer compiles
@@ -291,7 +328,4 @@ void model::get_first_order_completions(const context& cxt, list<completion> &co
   completions.push_back(complement_cmp);
 #endif
 }
-
-
-
 
