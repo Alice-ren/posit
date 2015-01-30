@@ -41,25 +41,21 @@ class model {
  public:
   model(unsigned memory_constraint);
   void train(const occurrence &givens);
-  double prob(const context& cxt, const event& e) const;
+  double prob(const context& cxt, const event& e);
   void get_first_order_completions(const context& cxt, list<completion> &completions) const; 
  private:
   void add_pattern(pattern p, double count);
   void add_sample(pattern* p, double count);
-  //void update_base_case(const pattern &p, double count);
   double prior_count(unsigned pattern_length, const event_bounds &p_bounds) const; //Assume an even prior distribution of events and patterns
-  //void subdivide_pattern(pattern* p, unsigned split_point);  //Wrong - patterns can be subdivided arbitrarily not just into two contiguous pieces
   double sample_size(const pattern& p);
-  double local_prob(const context& cxt, const pattern& p, unsigned t_abs);
-  double global_prob(const context& cxt, const pattern& p, unsigned t_abs);
-  pattern get_base_level_pattern(unsigned p) const;
+  double local_prob(const context& cxt, pattern& p, unsigned t_abs) const;
+  double global_prob(const context& cxt, pattern& p, unsigned t_abs) const;
   
   list<pattern> top_level_patterns;
-  list<pattern> base_level_patterns;
-  //list<pattern> patterns; //Our corpus of data
+  pattern base_level_pattern;
   unsigned memory_constraint;
   double total_num_events;
-  //map<unsigned, double> base_case;
+  unsigned current_visit_hash_id;
 };
 
 #endif
