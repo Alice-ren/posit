@@ -41,7 +41,8 @@ typedef struct {
   vector<unsigned> dt;
   double count;
   double total_events_at_creation;
-
+  unsigned last_visit_hash_id;
+  
   //sub, super patterns
   vector<patt_link> super_patterns;
   vector<patt_link> sub_patterns;
