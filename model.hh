@@ -41,6 +41,7 @@ class model {
  public:
   model(unsigned memory_constraint);
   void train(const occurrence &givens);
+  double prob(const context& cxt, const event& e) const;
   void get_first_order_completions(const context& cxt, list<completion> &completions) const; 
  private:
   void add_pattern(pattern p, double count);
@@ -51,7 +52,7 @@ class model {
   double sample_size(const pattern& p);
   double local_prob(const context& cxt, const pattern& p, unsigned t_abs);
   double global_prob(const context& cxt, const pattern& p, unsigned t_abs);
-  double prob(const context& cxt, const occurrence& occ);
+  pattern get_base_level_pattern(unsigned p) const;
   
   list<pattern> top_level_patterns;
   list<pattern> base_level_patterns;
