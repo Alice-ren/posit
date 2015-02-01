@@ -6,6 +6,31 @@
 #include "pattern.hh"
 
 //pattern related functions
+bool already_visited(const pattern& p, unsigned visit_id, unsigned t_abs) {
+  return (p.last_visit_id == visit_id && find(p.visited_t_abs.begin(), p.visited_t_abs.end(), t_abs) != p.visited_t_abs.end());
+}
+
+void mark_visited(pattern& p, unsigned visit_id, unsigned t_abs) {
+  if(p.last_visit_id != visit_id)
+    p.visited_t_abs.clear();
+
+  p.last_visit_id = visit_id;
+  p.visited_t_abs.push_back(t_abs);
+}
+
+void get_super_patterns(const occurrence& occ, const pattern& p, vector<patt_link> &supers) {
+  if(p.p.empty()) { //base case pattern, contains a super for the givens at every possible t
+    supers.clear();
+    for(occurrence::const_iterator p_e = occ.begin();p_e != occ.end();p_e++) {
+      for(list<patt_link>::const_iterator p_link = p.super_links.begin(); p_link != p.super_links.end();p_link++) {
+	supers.push_back(patt_link(p_link.p_patt, p_e.t));
+      }
+    }
+  } else {
+    supers = p.super_links;
+  }
+}
+
 void print_pattern(const pattern& p) {
   std::cout << p.count << " of " << flush;
   for(unsigned i=0;i < p.p.size();i++) {

@@ -41,12 +41,13 @@ class model {
  public:
   model(unsigned memory_constraint);
   void train(const occurrence &givens);
-  double prob(const context& cxt, const event& e);
+  double prob(const occurrence& occ);
+  double prob(const occurrence& occ, const occurrence& givens);
   void get_first_order_completions(const context& cxt, list<completion> &completions) const; 
  private:
   void add_pattern(pattern p, double count);
   void add_sample(pattern* p, double count);
-  double prior_count(unsigned pattern_length, const event_bounds &p_bounds) const; //Assume an even prior distribution of events and patterns
+  double prior_count(unsigned pattern_length) const; //Assume an even prior distribution of events and patterns
   double sample_size(const pattern& p);
   double local_prob(const context& cxt, pattern& p, unsigned t_abs) const;
   double global_prob(const context& cxt, pattern& p, unsigned t_abs) const;
@@ -55,7 +56,8 @@ class model {
   pattern base_level_pattern;
   unsigned memory_constraint;
   double total_num_events;
-  unsigned current_visit_hash_id;
+  unsigned current_visit_id;
+  event_bounds p_bounds;
 };
 
 #endif

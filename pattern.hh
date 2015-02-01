@@ -33,7 +33,7 @@ using namespace std;
 class pattern;
 typedef struct {
   pattern* p_patt;
-  unsigned sub_pattern_t_offset;
+  unsigned t_offset;
 } patt_link;
 
 typedef struct {
@@ -41,14 +41,17 @@ typedef struct {
   vector<unsigned> dt;
   double count;
   double total_events_at_creation;
-  unsigned last_visit_hash_id;
+  unsigned last_visit_id;
+  list<unsigned> visited_t_abs; //for this visit id.  We only want to visit each pattern one time with a particular t_abs.
   
   //sub, super patterns
-  vector<patt_link> super_patterns;
-  vector<patt_link> sub_patterns;
+  list<patt_link> super_links;
+  list<patt_link> sub_links;
 } pattern;
 
-
+bool already_visited(const pattern& p, unsigned visit_id, unsigned t_abs);
+void mark_visited(pattern& p, unsigned visit_id, unsigned t_abs);
+void get_super_patterns(const occurrence& occ, const pattern& p, list<patt_link> &supers);
 void print_pattern(const pattern& p);
 void print_patterns(const list<pattern>& patterns);
 bool operator==(const pattern& p1, const pattern& p2);
