@@ -31,15 +31,6 @@ bool operator==(const event& t1, const event& t2);
 bool operator!=(const event& t1, const event& t2);
 void print_event(const event& e);
 
-//A completion is an event combined with the probability of that event (in some context)
-typedef struct {
-  event e;
-  double prob;
-  double quality;
-} completion;
-
-bool compare_quality(const completion& c1, const completion& c2);
-
 //An occurrence is a set of events, each represented with respect to absolute time
 typedef vector<event> occurrence;
 
