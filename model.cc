@@ -16,6 +16,9 @@
 model::model(unsigned memory_constraint) {
   this->memory_constraint = memory_constraint;
   total_num_events = 0.0;
+
+  PRIOR_EVENT_DENSITY = 1.0;
+  PRIOR_INTERVAL = 1.0;
 	
   //Load the counts for the base case N=1 with even prior distribution
   /*const double PRIOR_COUNTS = 0.02;  //We don't ever want to assume zero probability for something, so we initialize to a small prior count.
@@ -37,21 +40,10 @@ void model::add_pattern(pattern p, double count) {
   update_base_case(p, count);
 }
 
-void model::update_base_case(const pattern &p, double count) {
-  for(vector<unsigned>::const_iterator p_iter = p.p.begin();p_iter != p.p.end();p_iter++) {
-    base_case[*p_iter] += count;
-  }
-}
-
 //FIXME: This function does not depend on any element of model.  Move the constants into the model.
 double model::prior_count(unsigned pattern_length) const {
-  const double PRIOR_EVENT_DENSITY = 1.0, PRIOR_INTERVAL = 1.0;
   double prior_position_density = PRIOR_EVENT_DENSITY/(double(p_bounds.ub - p_bounds.lb));
   return pow(prior_position_density, pattern_length)*PRIOR_INTERVAL;
-}
-
-void model::subdivide_pattern(pattern* p, unsigned split_point) {
-  //later
 }
 
 //This function is a stub.  But it will work in a limited way.  Ignores mem_constraint.
@@ -67,6 +59,10 @@ void model::train(const occurrence &givens) {
   add_pattern(get_pattern(givens), 1.0);
   add_pattern(get_pattern(dup_givens), -1.0); //So that we don't double count
   prev_givens = givens;
+}
+
+unsigned model::get_new_visit_id() const {
+  return ++current_visit_id;
 }
 
 //Returns the size of the sample space containing p
@@ -125,9 +121,8 @@ void model::find_terms(const occurrence& occ, list<term> &terms, pattern& patt, 
 
 double model::prob(const occurrence& occ) {
   //Find the terms necessary to make occ
-  current_visit_id++;
   list<term> terms;
-  find_terms(occ, term, base_level_pattern, 0, current_visit_id);
+  find_terms(occ, term, base_level_pattern, 0, get_new_visit_id());
 
   //Take the conditional product of terms which are different in the occ
   term tm;
