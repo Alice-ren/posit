@@ -37,20 +37,43 @@ using namespace std;
   Any model is subject to a few constraints:  First, that it has the public functions below.  Second, the completions that the model returns cannot ever have exactly zero or exactly 100% probability.  In fact if a certain event can occur at all, the model must give some nonzero probability for it to occur at any time.
 */
 
+class model;
+
+//A completion is an event combined with the probability of that event (in some context)
+typedef struct {
+  event e;
+  double prob;
+} completion;
+
+//A completion set is a convenient but efficient way to access the results of a probability query against the model.
+class completion_set {
+public:
+  completion_set(model* p_model, unsigned t) { this->p_model = p_model; this->t = t; }
+  completion operator[] (unsigned i) const;
+  unsigned num_completions() const;
+  unsigned size() const;
+  double total_prob() const;
+  void add_completion(const event &e, double prob);
+private:
+  unsigned t;
+  map<unsigned, completion> explicit_completions;
+  model* p_model; //Used to find prior_count
+};
+
 class model {
  public:
   model(unsigned memory_constraint);
   void train(const occurrence &givens);
   double prob(const occurrence& occ);
   double prob(const occurrence& occ, const occurrence& givens);
-  void get_first_order_completions(const context& cxt, list<completion> &completions) const; 
+  completion_set get_first_order_completions(const context& cxt) const;
  private:
   void add_pattern(pattern p, double count);
   void add_sample(pattern* p, double count);
   double prior_count(unsigned pattern_length) const; //Assume an even prior distribution of events and patterns
   double sample_size(const pattern& p);
-  double local_prob(const context& cxt, pattern& p, unsigned t_abs) const;
-  double global_prob(const context& cxt, pattern& p, unsigned t_abs) const;
+  double local_prob(const pattern& p) const;
+  unsigned get_new_visit_id() const;
   
   list<pattern> top_level_patterns;
   pattern base_level_pattern;
@@ -58,6 +81,8 @@ class model {
   double total_num_events;
   unsigned current_visit_id;
   event_bounds p_bounds;
+  double PRIOR_EVENT_DENSITY = 1.0;
+  double PRIOR_INTERVAL = 1.0;
 };
 
 #endif
