@@ -48,15 +48,16 @@ typedef struct {
 //A completion set is a convenient but efficient way to access the results of a probability query against the model.
 class completion_set {
 public:
-  completion_set(model* p_model, unsigned t) { this->p_model = p_model; this->t = t; }
+  completion_set(model* p_model, unsigned t_abs) { this->p_model = p_model; this->t_abs = t_abs; }
   completion operator[] (unsigned i) const;
-  unsigned num_completions() const;
   unsigned size() const;
   double total_prob() const;
   void add_completion(const event &e, double prob);
 private:
-  unsigned t;
+  unsigned t_abs;
   map<unsigned, completion> explicit_completions;
+  vector<completion> prior_completions;
+  double explicit_completions_total_prob;
   model* p_model; //Used to find prior_count
 };
 
@@ -65,15 +66,17 @@ class model {
   model(unsigned memory_constraint);
   void train(const occurrence &givens);
   double prob(const occurrence& occ);
-  double prob(const occurrence& occ, const occurrence& givens);
-  completion_set get_first_order_completions(const context& cxt) const;
+  double conditional_prob(const occurrence& occ, const occurrence& givens);
+  void get_first_order_completions(occurrence& occ, unsigned t_abs, completion_set& result_set)
  private:
   void add_pattern(pattern p, double count);
   void add_sample(pattern* p, double count);
   double prior_count(unsigned pattern_length) const; //Assume an even prior distribution of events and patterns
   double sample_size(const pattern& p);
+  bool is_match(const occurrence& occ, const pattern& p, unsigned t_abs) const;
   double local_prob(const pattern& p) const;
   unsigned get_new_visit_id() const;
+  void find_terms(const occurrence& occ, list<term> &terms, pattern& patt, unsigned t_abs, unsigned visit_id) const;
   
   list<pattern> top_level_patterns;
   pattern base_level_pattern;
