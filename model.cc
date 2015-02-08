@@ -14,7 +14,7 @@
 */
 
 //The member functions of the completion_set class
-completion_set::completion_set(model* p_model, unsigned t_abs) {
+completion_set::completion_set(model* p_model, int t_abs) {
   this->p_model = p_model;
   this->t_abs = t_abs;
 }
@@ -125,7 +125,7 @@ void model::train(const occurrence &givens) {
   prev_givens = givens;
 }
 
-unsigned model::get_new_visit_id() const {
+unsigned model::get_new_visit_id() {
   return ++current_visit_id;
 }
 
@@ -140,7 +140,7 @@ double model::local_prob(const pattern& p) const {
   return (p.count + prior_count(p.p.size()))/(sample_size(p) + prior_count(0));  //this could be made faster but this is elegant
 }
 
-bool model::is_match(const occurrence& occ, const pattern& p, unsigned t_abs) const {
+bool model::is_match(const occurrence& occ, const pattern& p, int t_abs) const {
   return is_single_valued(get_union(occ, get_occurrence(p, t_abs)));
 }
 
@@ -153,7 +153,7 @@ public:
 };
 
 //Find the top level terms necessary to find P(occ)
-void model::find_terms(const occurrence& occ, list<term> &terms, pattern& patt, unsigned t_abs, unsigned visit_id) const {
+void model::find_terms(const occurrence& occ, list<term> &terms, pattern& patt, int t_abs, unsigned visit_id) const {
   if(already_visited(patt, visit_id, t_abs) || !match(occ, patt, t_abs))
     return;
   
@@ -165,11 +165,11 @@ void model::find_terms(const occurrence& occ, list<term> &terms, pattern& patt, 
   //Based on the super patterns, get the super terms.
   list<term> new_terms;
   //Add onto the list this pattern, locally.
-  new_terms.push_back(term(get_occurrence(patt, t_abs), local_prob(occ, patt, t_abs)));
+  new_terms.push_back(term(get_occurrence(patt, t_abs), local_prob(patt)));
 
   //Get the terms corresponding to super patterns of patt.
   for(auto p_link = super_patterns.begin();p_link != super_patterns.end();p_link++) {
-    find_terms(occ, new_terms, *(p_link.p_patt), t_abs + p_link.t_offset, visit_id);
+    find_terms(occ, new_terms, *(p_link.p_patt), t_abs + p_link->t_offset, visit_id);
   }
   
   //For each pair of new terms:
@@ -215,7 +215,6 @@ double model::prob(const occurrence& occ) {
   term current;
   current.prob = 1.0;
 
-  //FIXME not done
   //For each term, divide out the overlap between this term and the last by calling prob recursively
   for(auto p_term = terms.begin();p_term != terms.end();p_term++) {
     current.prob *= p_term->prob;
@@ -278,9 +277,73 @@ double model::conditional_prob(const occurrence& occ, const occurrence& givens) 
   return prob(get_union(occ, givens))/prob(givens);
 }
 
+//Since the calling code does not a lot of information about the internal state of the mode, we have to make
+//some decisions here about which time tick to return the completions for.  To do that we collect
+//information about the number of patterns which have information about each tick.
+//We also want to know what the potential events are at that tick, so that we can ask for the probability.
+//This function supplies both those things.  I'm calling it a "heuristic" function, where "heuristic"
+//is a latin word meaning "really I'm just guessing"
+void model::get_completion_heuristics(const occurrence& occ,
+				      map<int, double> total_prob_heuristic, //Adds up probability in a way that strictly speaking makes no sense
+				      map<int, vector<event> > events_to_return_heuristic,
+				      const pattern& patt,
+				      int t_abs,
+				      unsigned visit_id) {
+  if(already_visited(patt, visit_id, t_abs) || !match(occ, patt, t_abs))
+    return;
+  
+  mark_visited(patt, visit_id, t_abs);
+  
+  list<patt_link> super_patterns;
+  get_super_patterns(occ, patt, supers);
+  
+  //Add heuristics for this pattern, locally.
+  occurrence patt_occ = get_occurrence(patt, t_abs);
+  for(auto p_event = patt_occ.begin();p_event != patt_occ.end();p_event++) {
+    total_prob_heuristic[p_event->t] += local_prob(patt);
+    events_to_return_heuristic[p_event->t].push_back(*p_event);
+  }
+
+  //Add in the heuristics corresponding to super patterns of patt.
+  for(auto p_link = super_patterns.begin();p_link != super_patterns.end();p_link++) {
+    get_completion_heruistics(occ, total_prob_heuristic, events_to_return_heuristic, *(p_link->p_patt), t_abs + p_link->t_offset, visit_id);
+  }
+  
+}
+
+//Returns the best t_abs, and the list of explicit events at that t_abs.
+unsigned model::pick_best_t_abs(const occurrence& occ,
+				 vector<event> &explicit_events) {
+  map<int, double> total_prob_heuristic;
+  map<int, vector<event> > events_to_return_heuristic;
+  get_completion_heuristics(occ, total_prob_heuristic, events_to_return_heuristic, base_level_pattern, 0, get_new_visit_id());
+  
+  //Pick the best tick to expand and grab the list of events to try
+  unsigned best_t_abs = 0;
+  double best_total_prob = 0.0;
+  for(auto p_tph = total_prob_heuristic.begin();p_tph != total_prob_heuristic.end();p_tph++) {
+    if(p_tph->second > best_total_prob) {
+      best_t_abs = p_tph->first;
+      best_total_prob = p_tph->second;
+    }
+  }
+
+  explicit_events = events_to_return_heuristic[best_t_abs];
+  return best_t_abs;
+}
+
 //Return a completion_set containing information about all the first order events with their probability
 //at a particular absolute time.
-void model::get_first_order_completions(occurrence& occ, unsigned t_abs, completion_set& result_set) {
-  
+completion_set model::get_first_order_completions(const occurrence& occ) {
+  int t_abs;
+  vector<event> events;
+  t_abs = pick_best_t_abs(occ, events);
+
+  completion_set result_set(this, t_abs);
+  for(auto p_event = events.begin();p_event != events.end();p_event++) {
+    result_set.add_completion(*p_event, prob(get_union(get_occurrence(e), occ)));
+  }
+
+  return result_set;
 }
 

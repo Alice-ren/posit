@@ -49,8 +49,8 @@ typedef struct {
   list<patt_link> sub_links;
 } pattern;
 
-bool already_visited(const pattern& p, unsigned visit_id, unsigned t_abs);
-void mark_visited(pattern& p, unsigned visit_id, unsigned t_abs);
+bool already_visited(const pattern& p, unsigned visit_id, int t_abs);
+void mark_visited(pattern& p, unsigned visit_id, int t_abs);
 void get_super_patterns(const occurrence& occ, const pattern& p, list<patt_link> &supers);
 void print_pattern(const pattern& p);
 void print_patterns(const list<pattern>& patterns);

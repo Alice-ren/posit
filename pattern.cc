@@ -6,11 +6,11 @@
 #include "pattern.hh"
 
 //pattern related functions
-bool already_visited(const pattern& p, unsigned visit_id, unsigned t_abs) {
+bool already_visited(const pattern& p, unsigned visit_id, int t_abs) {
   return (p.last_visit_id == visit_id && find(p.visited_t_abs.begin(), p.visited_t_abs.end(), t_abs) != p.visited_t_abs.end());
 }
 
-void mark_visited(pattern& p, unsigned visit_id, unsigned t_abs) {
+void mark_visited(pattern& p, unsigned visit_id, int t_abs) {
   if(p.last_visit_id != visit_id)
     p.visited_t_abs.clear();
 
