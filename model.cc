@@ -125,8 +125,18 @@ void model::train(const occurrence &givens) {
   prev_givens = givens;
 }
 
+//FIXME: if we ever run this algorithm in parallel there will have to be some more
+//sophisticated method than this for visiting each node once.  It would be once
+//per thread not just once.  This also means we cannot change the visit id inside
+//any recursive function that is crawling the tree.
 unsigned model::get_new_visit_id() {
   return ++current_visit_id;
+}
+
+//Returns true if the pattern and the occurrence are not mutually exclusive
+//FIXME: this is not local to model, move to pattern.cc
+bool model::is_compatible(const occurrence& occ, const pattern& p, int t_abs) const {
+  return is_single_valued(get_union(occ, get_occurrence(p, t_abs)));
 }
 
 //Returns the size of the sample space containing p
@@ -140,21 +150,36 @@ double model::local_prob(const pattern& p) const {
   return (p.count + prior_count(p.p.size()))/(sample_size(p) + prior_count(0));  //this could be made faster but this is elegant
 }
 
-bool model::is_match(const occurrence& occ, const pattern& p, int t_abs) const {
-  return is_single_valued(get_union(occ, get_occurrence(p, t_abs)));
+//Returns the total probability of getting this occ - but only works out of context
+//FIXME: explain why this works.  Negative counts and diamond subpatterns and all.
+double model::global_prob(const occurrence& occ, const pattern& patt, int t_abs, unsigned visit_id) {
+  if(visit_id == UINT_MAX)
+    visit_id = get_new_visit_id();
+  
+  if(already_visited(patt, visit_id, t_abs) || !is_compatible(occ, patt, t_abs))
+    return;
+  
+  mark_visited(patt, visit_id, t_abs);
+
+  double prob = 0.0;
+  if(is_sub_occurrence(get_occurrence(patt, t_abs), occ)) //This pattern is equal or a superset of occ, add the probability
+    prob += local_prob(patt);
+
+  //Add the probability of the super patterns
+  list<patt_link> super_patterns;
+  get_super_patterns(occ, patt, supers);
+  for(auto p_link = super_patterns.begin();p_link != super_patterns.end();p_link++)
+    prob += global_prob(occ, *(p_link.p_patt), t_abs + p_link->t_offset, visit_id);
+
+  return prob;
 }
 
-class term {
-public:
-  term(const occurrence& occ, double prob) { this->occ = occ; this->prob = prob; }
-  term() { prob = 1.0; }
-  occurrence occ;
-  double prob;
-};
-
 //Find the top level terms necessary to find P(occ)
-void model::find_terms(const occurrence& occ, list<term> &terms, pattern& patt, int t_abs, unsigned visit_id) const {
-  if(already_visited(patt, visit_id, t_abs) || !match(occ, patt, t_abs))
+void model::find_terms(const occurrence& occ, list<occurrence> &terms, pattern& patt, int t_abs, unsigned visit_id) const {
+  if(visit_id == UINT_MAX)
+    visit_id = get_new_visit_id();
+  
+  if(already_visited(patt, visit_id, t_abs) || !is_compatible(occ, patt, t_abs))
     return;
   
   mark_visited(patt, visit_id, t_abs);
@@ -163,9 +188,9 @@ void model::find_terms(const occurrence& occ, list<term> &terms, pattern& patt, 
   get_super_patterns(occ, patt, supers);
   
   //Based on the super patterns, get the super terms.
-  list<term> new_terms;
+  list<occurrence> new_terms;
   //Add onto the list this pattern, locally.
-  new_terms.push_back(term(get_occurrence(patt, t_abs), local_prob(patt)));
+  new_terms.push_back(get_occurrence(patt, t_abs));
 
   //Get the terms corresponding to super patterns of patt.
   for(auto p_link = super_patterns.begin();p_link != super_patterns.end();p_link++) {
@@ -175,30 +200,15 @@ void model::find_terms(const occurrence& occ, list<term> &terms, pattern& patt, 
   //For each pair of new terms:
   for(auto p_term_a = new_terms.begin();p_term_a != new_terms.end();p_term++) {
     auto p_term_b = p_term_a;
-    p_term_b++;
+    p_term_b++;  //Don't compare the term with itself
     while(p_term_b != new_terms.end()) {
-      bool remove_term_b = false;
-      occurrence term_a_intersection = get_intersection(p_term_a->occ, occ);
-      occurrence term_b_intersection = get_intersection(p_term_b->occ, occ);
-      
-      if(term_a_intersection == term_b_intersection) {
-	//Take the sum of probability for terms which are the same in the occ
-	//This is because the patterns are mutually exclusive and both contribute part of
-	//the total probability for the intersection occurrence.
-	p_term_a->prob += p_term_b->prob;
-	remove_term_b = true;
-      } else if(is_sub_occurrence(p_term_a->occ, p_term_b->occ)) {
+      if(is_sub_occurrence(p_term_a->occ, p_term_b->occ)) {
 	//Remove terms which are a strict sub of another term (not equal) in the occ.
 	//This is because the smaller one's probability would be divided out of the
 	//total probability for the multiplied terms anyway.
-	remove_term_b = true;
-      }
-      
-      if(remove_term_b) {
 	p_term_b = new_terms.erase(p_term_b);
       } else
 	p_term_b++;
-      }
     }
   }
   
@@ -208,19 +218,22 @@ void model::find_terms(const occurrence& occ, list<term> &terms, pattern& patt, 
 
 double model::prob(const occurrence& occ) {
   //Find the terms necessary to make occ
-  list<term> terms;
-  find_terms(occ, term, base_level_pattern, 0, get_new_visit_id());
+  list<occurrence> terms;
+  find_terms(occ, terms);
 
   //Take the conditional product of terms which are different in the occ
-  term current;
-  current.prob = 1.0;
+  occurrence current_occ;
+  double current_prob = 1.0;
 
   //For each term, divide out the overlap between this term and the last by calling prob recursively
   for(auto p_term = terms.begin();p_term != terms.end();p_term++) {
-    current.prob *= p_term->prob;
-    occurrence intersection_occ = get_intersection(current.occ, p_term->occ);
-    if(!intersection_occ.empty())
-      current.prob /= prob(intersection_occ);
+    current_prob *= global_prob(*p_term);
+    occurrence intersection_occ = get_intersection(current_occ, *p_term);
+
+    //Divide out the probability of the common part, since we are assuming that our patterns are
+    //coniditionally independent wrt their common parts.  Do it by calling this function recursively.
+    if(!intersection_occ.empty()) 
+      current-prob /= prob(intersection_occ);
   }
 
   //Return the product
