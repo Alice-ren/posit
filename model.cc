@@ -13,69 +13,6 @@
   The subdivide() function is not written yet, but when it is, we may do things like subdivide 1x"QABC" into 1x"QAB" and 1x"ABC".  In that case we would also want to generate or update the pattern "AB" with a negative count.  So if there were no previously existing examples of "AB" by itself we would have -1x"AB".  That seems wierd but it is consistent-because we add in the counts for superpatterns, if we ask for the count of ABC, we get one, QAB, we get one, and if we ask for the count of AB we get one (1+1-1).
 */
 
-//The member functions of the completion_set class
-completion_set::completion_set(model* p_model, int t_abs) {
-  this->p_model = p_model;
-  this->t_abs = t_abs;
-}
-
-//There are actually two different kinds of completions we might return - calculated ones and pure prior counts
-//completions.  This function abstracts them both into one type so the caller doesn't have to worry about the
-//difference.
-completion completion_set::operator[] (unsigned i) const {
-  if(i < explicit_completions.size()) //The easy case
-    return *(explicit_completions.begin() + i);
-  else {
-    //Add to the list of prior completions as necessary
-    unsigned prior_i = i - explicit_completions.size(); //prior_i is the index into the explicit completions vector
-    if(prior_i >= prior_completions.size()) { //We don't have that one yet
-      unsigned prior_p; //prior_p is the position corresponding to this prior_i
-      if(prior_completions.empty())
-	prior_p = p_model->p_bounds.lb;
-      else
-	prior_p = prior_completions.back().e.p + 1;
-      
-      while(prior_i >= prior_completions.size()) { //until the list of prior completions includes the one we want,
-	if(explicit_completions.find(prior_p) == explicit_completions.end()) {
-	  //if this is not an explicit completion,
-	  //add it to the list of prior completions
-	  completion cmp; cmp.e.p = prior_p; cmp.e.t = t_abs; cmp.prob = prior_counts(something);
-	  prior_completions.push_back(cmp);  
-	}
-	
-	prior_p++;
-	if(prior_p > p_model->p_bounds.ub) //Ran out of possibilities
-	  break;
-      }
-    }
-    
-    //Pull the appropriate completion and return it
-    if(prior_i < prior_completions.size()) {
-      return prior_completions[prior_i];
-    } else {
-      //We were asked for one that does not exist - return nothing
-      completion cmp;
-      cmp.prob = 0.0;
-      return cmp;
-    }
-  }
-}
-
-unsigned completion_set::size() const {
-  return p_model->p_bounds.ub - p_model->p_bounds.lb;
-}
-
-double completion_set::total_prob() const {
-  return explicit_completions_total_prob + p_model->prior_counts(something);
-}
-
-void completion_set::add_completion(const event &e, double prob) { //We don't check for duplicates
-  if(e.t != t_abs) { cout << "Bad value of e.t in completion_set::add_completion\n"; return; }
-  completion cmp; cmp.e = e;cmp.prob = prob;
-  explicit_completions_total_prob += prob;
-  explicit_completions[e.p] = cmp;
-}
-
 //Member functions for the model class
 model::model(unsigned memory_constraint) {
   this->memory_constraint = memory_constraint;
