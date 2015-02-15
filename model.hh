@@ -37,29 +37,6 @@ using namespace std;
   Any model is subject to a few constraints:  First, that it has the public functions below.  Second, the completions that the model returns cannot ever have exactly zero or exactly 100% probability.  In fact if a certain event can occur at all, the model must give some nonzero probability for it to occur at any time.
 */
 
-class model;
-
-//A completion is an event combined with the probability of that event (in some context)
-typedef struct {
-  event e;
-  double prob;
-} completion;
-
-//A completion set is a convenient but efficient way to access the results of a probability query against the model.
-class completion_set {
-public:
-  completion_set(model* p_model, int t_abs) { this->p_model = p_model; this->t_abs = t_abs; }
-  completion operator[] (unsigned i) const;
-  unsigned size() const;
-  double total_prob() const;
-  void add_completion(const event &e, double prob);
-private:
-  int t_abs;
-  map<unsigned, completion> explicit_completions;
-  vector<completion> prior_completions;
-  double explicit_completions_total_prob;
-  model* p_model; //Used to find prior_count
-};
 
 class model {
  public:
