@@ -28,6 +28,7 @@ using namespace std;
   of __C.  In order to do that we have to analyze the input data to the model and generate the smaller patterns as we can.
   But if there is no larger pattern we can use smaller patterns to estimate the probability of the larger one by using the assumption of conditional independence;
   i.e. P(ABC) = P(AB)P(BC)/P(B)
+  
 */
 
 class pattern;
