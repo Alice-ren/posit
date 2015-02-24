@@ -47,6 +47,95 @@ void print_patterns(const list<pattern>& patterns) {
     print_pattern(*p_patt);
 }
 
+void relink_common_subsections(const pattern& root, const occurrence& occ1, const occurrence& occ2) {
+  list<occurrence> new_patts = match(occ1, occ2);
+  for(auto pn = new_patts.begin();pn != new_patts.end();pn++) {
+    relink(root, *pn);
+  }
+}
+
+//A couple helper functions to reduce boilerplate
+void reset_super_link(pattern& p, pattern* link_patt, int t_offset) {
+  for(auto p_link = p.super_links.begin();p_link != p.super_links.end();p_link++) {
+    if(p_link->p_patt == link_patt && p_link->t_offset == t_offset)
+      return; //already here
+  }
+
+  patt_link pl;
+  pl.p_patt = link_patt;
+  pl.t_offset = t_offset;
+  p.super_links.push_back(pl);
+}
+
+void reset_sub_link(pattern& p, pattern* link_patt, int t_offset) {
+  for(auto p_link = p.sub_links.begin();p_link != p.sub_links.end();p_link++) {
+    if(p_link->p_patt == link_patt && p_link->t_offset == t_offset)
+      return; //already here
+  }
+
+  patt_link pl;
+  pl.p_patt = link_patt;
+  pl.t_offset = t_offset;
+  p.sub_links.push_back(pl);
+}
+
+//Performs a no-touch relink (in other words calling this function does not affect returned statistics)
+void relink(const pattern& root, const occurrence& occ, bool only_new = true) {
+  list<patt_link> supers;
+  list<patt_link> subs;
+  list<pattern*> siblings;
+  pattern* p_patt;
+  find_context(root, occ, supers, subs, siblings, p_patt, get_next_visit_id());
+
+  if(p_patt == NULL) {
+    p_patt = new pattern;
+    *p_patt = get_pattern(occ); //set p and t.  FIXME: pattern as a node is logically now different from pattern as a set of p's and t's
+    p_patt->count = 0.0;
+    p_patt->last_visit_id = MAX_UINT;
+  } else if(only_new)
+    return; //This is an existing pattern and we are only relinking new ones
+
+  //Set the super, sub links
+  p_patt->super_links = supers;
+  p_patt->sub_links = subs;
+
+  //Make sure links in subs, supers back to this pattern are set correctly
+  for(auto p_link = supers.begin();p_link != supers.end();p_link++)
+    reset_sub_link(p_link->p_patt, p_patt, -(p_link->t_offset));
+  
+  for(auto p_link = subs.begin();p_link != subs.end();p_link++)
+    reset_super_link(p_link->p_patt, p_patt, -(p_link->t_offset));
+
+  //Check self and sibling patterns for common subsections
+  relink_common_subsections(root, occ, occ);
+  for(auto p_sib = siblings.begin();p_sib != siblings.end();p_sib++)
+    relink_common_subsections(root, get_occurrence(*p_sib, 0), occ);
+}
+
+//patt is a pointer to the pattern representing occ, unless occ would be a new pattern.
+void find_context(const pattern& p_current, const occurrence& occ,
+		  list<pattern*> &supers,
+		  list<pattern*> &subs,
+		  list<pattern*> &siblings,
+		  pattern* &p_patt, unsigned visit_id) {
+
+  //FIXME finish this
+}
+
+//Severs a link and abstracts away the sub pattern.
+//Removes events unique to the sub from the super.
+//Preserves counts for queries that do not cross the link boundary.
+//This DOES affect returned statistics.
+void sever_link(pattern &patt, sub_link_index) {
+  //FIXME finish this
+}
+
+//optimize tree to within memory constraints.
+//FIXME: figure out how to balance between memory spent on the apex pattern vs memory spent on the rest
+void optimize(const pattern& root, unsigned memory_constraint) {
+  //FIXME finish this
+}
+
 bool operator==(const pattern& p1, const pattern& p2) {
   if(p1.p.size() != p2.p.size() || p1.dt.size() != p2.dt.size())
     return false;
