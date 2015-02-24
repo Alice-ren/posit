@@ -56,8 +56,8 @@ class model {
   unsigned get_new_visit_id();
   void find_terms(const occurrence& occ, list<term> &terms, pattern& patt = base_level_pattern, int t_abs = 0, unsigned visit_id = UINT_MAX) const;
   
-  list<pattern> top_level_patterns;
-  pattern base_level_pattern;
+  pattern apex;
+  pattern root;
   unsigned memory_constraint;
   double total_num_events;
   unsigned current_visit_id;
