@@ -20,46 +20,26 @@ model::model(unsigned memory_constraint) {
 
   PRIOR_EVENT_DENSITY = 1.0;
   PRIOR_INTERVAL = 1.0;
-	
-  //Load the counts for the base case N=1 with even prior distribution
-  /*const double PRIOR_COUNTS = 0.02;  //We don't ever want to assume zero probability for something, so we initialize to a small prior count.
-    for(unsigned i=0;i < (bounds.event_ub - bounds.event_lb);i++) {
-    pattern patt;
-    patt.p.push_back(i);
-    add_pattern(patt, PRIOR_COUNTS);
-    }*/
 }
 
-void model::add_sample(pattern* p, double count) {
-  p->count += count;
-  update_base_case(*p, count);
-}
- 
-void model::add_pattern(pattern p, double count) {
-  p.count = count;
-  patterns.push_back(p);
-  update_base_case(p, count);
-}
-
-//FIXME: This function does not depend on any element of model.  Move the constants into the model.
 double model::prior_count(unsigned pattern_length) const {
   double prior_position_density = PRIOR_EVENT_DENSITY/(double(p_bounds.ub - p_bounds.lb));
   return pow(prior_position_density, pattern_length)*PRIOR_INTERVAL;
 }
 
-//This function is a stub.  But it will work in a limited way.  Ignores mem_constraint.
-//FIXME: Add the ability to subdivide existing patterns as events are added until we are within some memory constraint.
-/*-Need to determine which patterns should be purged by looking at the older ones (?) and
-  a) asking which ones can be written as a product of conditionally independent factors
-  b) asking which ones have only occurred once ever and are large.
-  Maybe there is some more elegant way of choosing thresholds for "old" and "large".
-*/
-void model::train(const occurrence &givens) {
-  static occurrence prev_givens; //state variablee - last set of givens, so we can determine which are new
-  occurrence dup_givens = get_intersection(prev_givens, givens);
-  add_pattern(get_pattern(givens), 1.0);
-  add_pattern(get_pattern(dup_givens), -1.0); //So that we don't double count
-  prev_givens = givens;
+//Train the pattern tree given some new data
+void model::train(const event& e) {
+  //Add event to apex pattern.  This DOES affect returned statistics.
+  apex.occ = get_union(apex.occ, get_occurrence(e));
+  
+  //make sure common subsections exist
+  relink_common_subsections(root, apex, apex);
+
+  //relink the apex pattern (without modifying counts anywhere)
+  relink(root, apex.occ, false);
+  
+  //optimize to within memory_constraint.  This DOES affect returned statistics.
+  optimize(root, memory_constraint);
 }
 
 //FIXME: if we ever run this algorithm in parallel there will have to be some more
