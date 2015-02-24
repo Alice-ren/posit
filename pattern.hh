@@ -28,7 +28,6 @@ using namespace std;
   of __C.  In order to do that we have to analyze the input data to the model and generate the smaller patterns as we can.
   But if there is no larger pattern we can use smaller patterns to estimate the probability of the larger one by using the assumption of conditional independence;
   i.e. P(ABC) = P(AB)P(BC)/P(B)
-  
 */
 
 class pattern;
@@ -55,6 +54,13 @@ void mark_visited(pattern& p, unsigned visit_id, int t_abs);
 void get_super_patterns(const occurrence& occ, const pattern& p, list<patt_link> &supers);
 void print_pattern(const pattern& p);
 void print_patterns(const list<pattern>& patterns);
+void relink_common_subsections(const pattern& root, const occurrence& occ1, const occurrence& occ2);
+pattern* relink(const pattern& root, const occurrence& occ);
+void find_context(const pattern& p_current, const occurrence& occ,
+		  list<pattern*> &supers,
+		  list<pattern*> &subs,
+		  list<pattern*> &siblings,
+		  pattern* &patt, unsigned visit_id);
 bool operator==(const pattern& p1, const pattern& p2);
 
 //functions related to patterns and occurrences
