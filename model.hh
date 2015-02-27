@@ -46,8 +46,6 @@ class model {
   double conditional_prob(const occurrence& occ, const occurrence& givens);
   completion_set get_first_order_completions(occurrence& occ, int t_abs);
  private:
-  void add_pattern(pattern p, double count);
-  void add_sample(pattern* p, double count);
   double prior_count(unsigned pattern_length) const; //Assume an even prior distribution of events and patterns
   double sample_size(const pattern& p);
   bool is_match(const occurrence& occ, const pattern& p, int t_abs) const;
@@ -55,9 +53,15 @@ class model {
   double global_prob(const occurrence& occ, const pattern& patt = base_level_pattern, int t_abs = 0, unsigned visit_id = UINT_MAX) const;
   unsigned get_new_visit_id();
   void find_terms(const occurrence& occ, list<term> &terms, pattern& patt = base_level_pattern, int t_abs = 0, unsigned visit_id = UINT_MAX) const;
-  
-  pattern apex;
-  pattern root;
+  void relink_common_subsections(const occurrence& occ1, const occurrence& occ2);
+  pattern* relink(const pattern& root, const occurrence& occ);
+  void find_context(const pattern& p_current, const occurrence& occ,
+		    list<pattern*> &supers,
+		    list<pattern*> &subs,
+		    list<pattern*> &siblings,
+		    pattern* &patt, unsigned visit_id);  
+  model_node apex;
+  model_node root;
   unsigned memory_constraint;
   double total_num_events;
   unsigned current_visit_id;
