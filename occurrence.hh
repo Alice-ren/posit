@@ -1,5 +1,5 @@
 /*****
-      occurrence.h
+      occurrence.hh
       event class, occurrence class (typedef'd list of events) and some helper functions.
 ******/
 
