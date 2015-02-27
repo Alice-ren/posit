@@ -30,71 +30,19 @@ using namespace std;
   i.e. P(ABC) = P(AB)P(BC)/P(B)
 */
 
-class pattern;
-typedef struct {
-  pattern* p_patt;
-  unsigned t_offset;
-} patt_link;
-
-typedef struct {
+class pattern {
+public:
   vector<unsigned> p;
   vector<unsigned> dt;
-  double count;
-  double total_events_at_creation;
-  unsigned last_visit_id;
-  list<unsigned> visited_t_abs; //for this visit id.  We only want to visit each pattern one time with a particular t_abs.
-  
-  //sub, super patterns
-  list<patt_link> super_links;
-  list<patt_link> sub_links;
-} pattern;
+};
 
-bool already_visited(const pattern& p, unsigned visit_id, int t_abs);
-void mark_visited(pattern& p, unsigned visit_id, int t_abs);
-void get_super_patterns(const occurrence& occ, const pattern& p, list<patt_link> &supers);
 void print_pattern(const pattern& p);
 void print_patterns(const list<pattern>& patterns);
-void relink_common_subsections(const pattern& root, const occurrence& occ1, const occurrence& occ2);
-pattern* relink(const pattern& root, const occurrence& occ);
-void find_context(const pattern& p_current, const occurrence& occ,
-		  list<pattern*> &supers,
-		  list<pattern*> &subs,
-		  list<pattern*> &siblings,
-		  pattern* &patt, unsigned visit_id);
 bool operator==(const pattern& p1, const pattern& p2);
 
 //functions related to patterns and occurrences
 occurrence get_occurrence(const pattern& pat, int t_abs);
 pattern get_pattern(const occurrence& occ);
-
-//functions related to matches
-typedef struct {
-  //pattern* p_patt;
-  occurrence patt_occ;  //The whole matched pattern, as an occurrence
-  occurrence match_occ; //Matched portion of patt_occ
-  //event e;
-  double local_count; //Count for the matched pattern as stored, not including superpatterns
-  double match_global_count; //Count for the matched occurrence, including counts of supersets of the matched occurrence
-  double patt_global_count; //Count for the matched pattern, including counts of supersets of the matched pattern.
-  //Note: global_count >= local_count always.
-  double prob;
-} match;
-
-void print_match(const match& match);
-void print_matches(const list<match>& matches);
-
-void get_pattern_matches(const occurrence& occ, const pattern& patt, list<patt_link>& matches);
-bool get_suboccurrences_matching_pattern(const occurrence &occ, const pattern &patt, list<occurrence> &matches);
-double count_suboccurrences_matching_pattern(const occurrence &occ, const pattern &patt);
-bool get_occurrence_matches(const occurrence &occ, const pattern &patt, list<match> &matches); //Get all the matches
-void set_global_counts(list<match> &matches); //Sets the global count of each match given that we know the local counts
-void set_local_counts(list<match> &matches, occurrence oracle_occ); //sets the local count of each match given some occurrence to use to measure the global count
-void make_unique(list<match> &matches); //Eliminate duplicate pattern occurrences from this list of matches
-void make_unique(list<patt_link> &matches); //Eliminate duplicate pattern occurrences from this list of matches
-void consolidate(list<match> &matches); //Eliminate duplicate pattern occurrences from this list of matches, and sum counts
-bool match_occurrence_size_descending(const match& m1, const match& m2);
-bool match_occurrence_size_ascending(const match& m1, const match& m2);
-//bool match_global_count_descending(const match& m1, const match& m2);
-bool match_new_event_descending(const match& m1, const match& m2);
+void convolute(const occurrence& occ1, const occurrence& occ2, list<pattern>& patterns, list<int>& t_offset);
 
 #endif
