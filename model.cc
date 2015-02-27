@@ -13,6 +13,77 @@
   The subdivide() function is not written yet, but when it is, we may do things like subdivide 1x"QABC" into 1x"QAB" and 1x"ABC".  In that case we would also want to generate or update the pattern "AB" with a negative count.  So if there were no previously existing examples of "AB" by itself we would have -1x"AB".  That seems wierd but it is consistent-because we add in the counts for superpatterns, if we ask for the count of ABC, we get one, QAB, we get one, and if we ask for the count of AB we get one (1+1-1).
 */
 
+//Model node and associated functions
+class model_node;
+class mn_link {
+public:
+  mn_link(model_node* p_node, int t_offset) { this->p_node = p_node; this->t_offset = t_offset; }
+  model_node* p_node;
+  int t_offset;
+};
+
+class model_node {
+public:
+  
+  bool already_visited(unsigned visit_id, int t_abs);
+  void mark_visited(unsigned visit_id, int t_abs);
+  void get_super_patterns(const occurrence& target_occ, list<mn_link> &supers);
+  void reset_super_link(pattern* link_patt, int t_offset);
+  void reset_sub_link(pattern* link_patt, int t_offset);
+  
+  pattern patt;
+  double count;
+  unsigned last_visit_id;
+  list<unsigned> visited_t_abs; //for this visit id.  We only want to visit each pattern one time with a particular t_abs.
+  
+  //sub, super patterns
+  list<patt_link> super_links;
+  list<patt_link> sub_links;
+};
+
+bool model_node::already_visited(unsigned visit_id, int t_abs) {
+  return (last_visit_id == visit_id && find(visited_t_abs.begin(), visited_t_abs.end(), t_abs) != visited_t_abs.end());
+}
+
+void model_node::mark_visited(unsigned visit_id, int t_abs) {
+  if(last_visit_id != visit_id)
+    visited_t_abs.clear();
+
+  last_visit_id = visit_id;
+  visited_t_abs.push_back(t_abs);
+}
+
+void model_node::get_super_patterns(const occurrence& target_occ, list<mn_link> &supers) {
+  if(patt.p.empty()) { //base case pattern, contains a super for the givens at every possible t
+    supers.clear();
+    for(auto p_e = target_occ.cbegin();p_e != target_occ.cend();p_e++) {
+      for(auto p_link = super_links.cbegin(); p_link != super_links.cend();p_link++) {
+	supers.push_back(mn_link(p_link->p_node, p_e->t));
+      }
+    }
+  } else {
+    supers = super_links;
+  }
+}
+
+void model_node::reset_super_link(model_node* link_node, int t_offset) {
+  for(auto p_link = super_links.begin();p_link != super_links.end();p_link++) {
+    if(p_link->p_patt == link_patt && p_link->t_offset == t_offset)
+      return; //already here
+  }
+
+  super_links.push_back(mn_link(link_node, t_offset));
+}
+
+void model_node::reset_sub_link(model_node* link_node, int t_offset) {
+  for(auto p_link = sub_links.begin();p_link != sub_links.end();p_link++) {
+    if(p_link->p_node == link_node && p_link->t_offset == t_offset)
+      return; //already here
+  }
+
+  sub_links.push_back(mn_link(link_node, t_offset));
+}
+
 //Member functions for the model class
 model::model(unsigned memory_constraint) {
   this->memory_constraint = memory_constraint;
@@ -22,24 +93,155 @@ model::model(unsigned memory_constraint) {
   PRIOR_INTERVAL = 1.0;
 }
 
-double model::prior_count(unsigned pattern_length) const {
-  double prior_position_density = PRIOR_EVENT_DENSITY/(double(p_bounds.ub - p_bounds.lb));
-  return pow(prior_position_density, pattern_length)*PRIOR_INTERVAL;
+void model::relink_common_subsections(const occurrence& occ1, const occurrence& occ2) {
+  list<pattern> new_patts;
+  convolute(occ1, occ2, new_patts);
+  for(auto pn = new_patts.begin();pn != new_patts.end();pn++) {
+    relink(root, get_occurrence(*pn, 0));
+  }
+}
+
+//Performs a no-touch relink (in other words calling this function does not affect returned statistics)
+void model::relink(const occurrence& occ, bool only_new = true) {
+  list<mn_link> supers;
+  list<mn_link> subs;
+  list<model_node*> siblings;
+  model_node* p_node;
+  find_context(root, occ, supers, subs, siblings, p_node, get_next_visit_id());
+
+  if(p_node == NULL) {
+    p_node = new model_node;
+    p_node->patt = get_pattern(occ);
+    p_node->count = 0.0;
+    p_node->last_visit_id = MAX_UINT;
+  } else if(only_new)
+    return; //This is an existing pattern and we are only relinking new ones
+
+  //Set the super, sub links
+  p_patt->super_links = supers;
+  p_patt->sub_links = subs;
+
+  //Make sure links in subs, supers back to this pattern are set correctly
+  for(auto p_link = supers.begin();p_link != supers.end();p_link++)
+    reset_sub_link(p_link->p_node, p_node, -(p_link->t_offset));
+  
+  for(auto p_link = subs.begin();p_link != subs.end();p_link++)
+    reset_super_link(p_link->p_node, p_node, -(p_link->t_offset));
+
+  //Check self and sibling patterns for common subsections
+  relink_common_subsections(occ, occ);
+  for(auto p_sib = siblings.begin();p_sib != siblings.end();p_sib++)
+    relink_common_subsections(get_occurrence(p_sib->patt, 0), occ);
+}
+
+//p_match is a pointer to the pattern representing occ, unless occ would be a new pattern in which it is NULL.
+//FIXME: not done, does not find offsets
+typedef enum {SUB, SUPER, SIBLING, IDENTITY, NONE} patt_relation;
+patt_relation model::find_context(model_node& p_current,
+				  const occurrence& target_occ,
+				  list<mn_link> &supers,
+				  list<mn_link> &subs,
+				  list<model_node*> &siblings,
+				  model_node* &p_match,
+				  int t_abs,
+				  unsigned visit_id) {
+  if(target_occ.empty())
+    return NONE;
+  
+  if(p_current.already_visited(visit_id, t_abs) || !is_compatible(target_occ, p_current, t_abs))
+    return NONE;
+  
+  p_current.mark_visited(visit_id, t_abs);
+
+  occurrence current_occ = get_occurrence(p_current.patt, t_abs);
+
+  //if this pattern is equal to the target, then set the p_match reference and call on the supers
+  if(current_occ == target_occ) {
+    list<mn_link> super_patterns;
+    p_current.get_super_patterns(target_occ, super_patterns);
+    for(auto p_link = super_patterns.begin();p_link != super_patterns.end();p_link++) {
+      find_context(*(p_link->p_node), target_occ, supers, subs, siblings, p_match, t_abs + p_link->t_offset, visit_id);
+    }
+
+    p_match = &p_current;
+    return IDENTITY;
+  }
+
+  //if this pattern is a strict super of the target, then add it to the supers list and return
+  if(is_sub_occurrence(current_occ, target_occ)) {
+    supers.push_back(mn_link(&p_current, t_abs - target_occ[0].t));
+    return SUPER;
+  }
+  
+  //if this pattern is a sub of the target, then call on the supers and add to the subs list if not the sub of a sub
+  if(is_sub_occurrence(target_occ, current_occ)) {
+    bool sub_of_a_sub = false;
+    list<mn_link> super_patterns;
+    p_current.get_super_patterns(target_occ, super_patterns);
+    for(auto p_link = super_patterns.begin();p_link != super_patterns.end();p_link++) {
+      if(find_context(*(p_link->p_node), target_occ, supers, subs, siblings, p_match, t_abs + p_link->t_offset, visit_id) == SUB)
+	sub_of_a_sub = true;
+    }
+    if(!sub_of_a_sub)
+      subs.push_back(mn_link(&p_current, t_abs - target_occ[0].t));
+    
+    return SUB;
+  }
+  
+  //if this pattern is compatible with the target, with a non-empty intersection, but neither a sub or super,
+  //nor the pattern itself, then add to the list of siblings.
+  if(!get_intersection(target_occ, current_occ).empty()) {
+    //Each super of a sibling could be: another sibling, or a super of the target, or nothing.
+    //If the super is a sup of the target, or a sib of the target, we would not want to add this pattern to the sibling list.
+    bool sub_of_a_sib_or_super = false;
+    list<mn_link> super_patterns;
+    p_current.get_super_patterns(target_occ, super_patterns);
+    for(auto p_link = super_patterns.begin();p_link != super_patterns.end();p_link++) {
+      patt_relation sup_relation = find_context(*(p_link->p_node), target_occ, supers, subs, siblings, p_match, t_abs + p_link->t_offset, visit_id);
+      if(sup_relation == SIBLING || sup_relation == SUPER)
+	sub_of_a_sib_or_super = true;
+    }
+    
+    if(!sub_of_a_sib_or_super)
+      siblings.push_back(&p_current);
+    
+    return SIBLING;
+  }
+}
+
+//Severs a link and abstracts away the sub pattern.
+//Removes events unique to the sub from the super.
+//Preserves counts for queries that do not cross the link boundary.
+//This DOES affect returned statistics.
+void model::sever_link(pattern &patt, sub_link_index) {
+  //FIXME finish this
+}
+
+//optimize tree to within memory constraints.
+//FIXME: figure out how to balance between memory spent on the apex pattern vs memory spent on the rest
+void model::optimize(const pattern& root, unsigned memory_constraint) {
+  //FIXME finish this
 }
 
 //Train the pattern tree given some new data
+//This DOES affect returned statistics.
 void model::train(const event& e) {
-  //Add event to apex pattern.  This DOES affect returned statistics.
-  apex.occ = get_union(apex.occ, get_occurrence(e));
+  //Manually insert an event to the end of the training set and link it to a base case pattern
   
   //make sure common subsections exist
-  relink_common_subsections(root, apex, apex);
+  relink_common_subsections(apex, apex);
 
   //relink the apex pattern (without modifying counts anywhere)
-  relink(root, apex.occ, false);
+  //FIXME: this does lots of extra work -really only the portions involving the new event need to be relinked.
+  relink(apex.occ, false);
   
   //optimize to within memory_constraint.  This DOES affect returned statistics.
-  optimize(root, memory_constraint);
+  optimize(memory_constraint);
+}
+ 
+double model::prior_count(unsigned pattern_length) const {
+  double prior_position_density = PRIOR_EVENT_DENSITY/(double(p_bounds.ub - p_bounds.lb));
+  return pow(prior_position_density, pattern_length)*PRIOR_INTERVAL;
 }
 
 //FIXME: if we ever run this algorithm in parallel there will have to be some more
@@ -50,14 +252,14 @@ unsigned model::get_new_visit_id() {
   return ++current_visit_id;
 }
 
+//FIXME: for all below functions, pattern& has been replaced by model_node&
 //Returns true if the pattern and the occurrence are not mutually exclusive
-//FIXME: this is not local to model, move to pattern.cc
 bool model::is_compatible(const occurrence& occ, const pattern& p, int t_abs) const {
   return is_single_valued(get_union(occ, get_occurrence(p, t_abs)));
 }
 
 //Returns the size of the sample space containing p
-//TODO: This probably should be frequency wrt time not frequency wrt events
+//FIXME: sample size is now the same for all patterns, rewrite this
 double model::sample_size(const pattern& p) {
   return total_num_events - p.total_events_at_creation + 1.0;  //might be wrong - time based not event based?
 }
