@@ -60,12 +60,12 @@ class model {
 		    list<pattern*> &subs,
 		    list<pattern*> &siblings,
 		    pattern* &patt, unsigned visit_id);  
-  model_node apex;
-  model_node root;
+  model_node* apex;
+  model_node* training_set;
+  model_node* base_case_0, base_case_1;
+  model_node* root;
   unsigned memory_constraint;
-  double total_num_events;
   unsigned current_visit_id;
-  event_bounds p_bounds;
   double PRIOR_EVENT_DENSITY = 1.0;
   double PRIOR_INTERVAL = 1.0;
 };
