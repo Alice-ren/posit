@@ -41,6 +41,7 @@ using namespace std;
 class model {
  public:
   model(unsigned memory_constraint);
+  ~model();
   void train(const occurrence &givens);
   double prob(const occurrence& occ);
   double conditional_prob(const occurrence& occ, const occurrence& givens);

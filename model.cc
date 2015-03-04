@@ -11,6 +11,11 @@
   We may still store a separate pattern AB, however, because we have found counts of AB which are not part of the larger pattern ABC.
   In that case, the raw count for AB will represent the count of occurrences of AB&(~C).  Therefore when we want the total count of AB*, we must take the sum of the count for AB, and add in the counts for ABC, ABQ and any other superpattern.  So the raw count for AB will represent the counts of AB which were not part of *any* superpattern.
   The subdivide() function is not written yet, but when it is, we may do things like subdivide 1x"QABC" into 1x"QAB" and 1x"ABC".  In that case we would also want to generate or update the pattern "AB" with a negative count.  So if there were no previously existing examples of "AB" by itself we would have -1x"AB".  That seems wierd but it is consistent-because we add in the counts for superpatterns, if we ask for the count of ABC, we get one, QAB, we get one, and if we ask for the count of AB we get one (1+1-1).
+FIXME: rewrite all the above.
+2015-03-02
+It occurs to me that I could make all this code quite a bit simpler by eliminating p from the event type, so that patterns consist only of time gaps and not positions.  I could probably merge pattern and occurrence together, which would simplify things a lot, although I would have to rewrite a lot of the matching and is_sub... functions.  I would also have to write a function to translate ascii to events where each bit would be mapped to some sequence like 11___ for zero and 1_1__ for 1.  Because 0 and 1 are mutually exclusive we want each to contain an event the other does not.  We also don't want to get false positives in strings of 1's and 0's.  So then 1101001 would be 11___11___1_1__11___1_1__1_1__11___.  I think the encoding works - I don't see any ambiguity there.  (If they were shorter you would get 11__11__1_1_11__1_1_1_1_11__ which as you can see has big sequences of 1_1_ where things can get confused.)  It makes the configuration tree very much simpler since a completion set would be binary just like the configuration tree so you'd just get a single event and a probability back.  It makes the root node much simpler since there is no second layer above it with just positions.
+Another option is straight up binary - that way we do still need the position, but we still get the result that a completion set has just two options, one of which can be inferred from the other.  And of course since we are just writing down time gaps the above number would be 1414231423231(4).  The binary mode is really a special case of the full position mode.
+
 */
 
 //Model node and associated functions
@@ -24,12 +29,13 @@ public:
 
 class model_node {
 public:
-  
+  model_node();
   bool already_visited(unsigned visit_id, int t_abs);
   void mark_visited(unsigned visit_id, int t_abs);
   void get_super_patterns(const occurrence& target_occ, list<mn_link> &supers);
   void reset_super_link(pattern* link_patt, int t_offset);
   void reset_sub_link(pattern* link_patt, int t_offset);
+  void unlink();
   
   pattern patt;
   double count;
@@ -40,6 +46,11 @@ public:
   list<patt_link> super_links;
   list<patt_link> sub_links;
 };
+
+void model_node::model_node() {
+  count = 0.0;
+  last_visit_id = UINT_MAX;
+}
 
 bool model_node::already_visited(unsigned visit_id, int t_abs) {
   return (last_visit_id == visit_id && find(visited_t_abs.begin(), visited_t_abs.end(), t_abs) != visited_t_abs.end());
@@ -54,7 +65,7 @@ void model_node::mark_visited(unsigned visit_id, int t_abs) {
 }
 
 void model_node::get_super_patterns(const occurrence& target_occ, list<mn_link> &supers) {
-  if(patt.p.empty()) { //base case pattern, contains a super for the givens at every possible t
+/  if(patt.p.empty()) { //base case pattern, contains a super for the givens at every possible t
     supers.clear();
     for(auto p_e = target_occ.cbegin();p_e != target_occ.cend();p_e++) {
       for(auto p_link = super_links.cbegin(); p_link != super_links.cend();p_link++) {
@@ -84,6 +95,12 @@ void model_node::reset_sub_link(model_node* link_node, int t_offset) {
   sub_links.push_back(mn_link(link_node, t_offset));
 }
 
+//Reaches out to the nodes linking onto this pattern and deletes those links too
+//If called from the relink() function, this function does NOT affect returned statistics.
+void model_node::unlink() {
+  
+}
+
 //Member functions for the model class
 model::model(unsigned memory_constraint) {
   this->memory_constraint = memory_constraint;
@@ -91,6 +108,53 @@ model::model(unsigned memory_constraint) {
 
   PRIOR_EVENT_DENSITY = 1.0;
   PRIOR_INTERVAL = 1.0;
+
+  /*
+    The tree is initialized like this:
+                     apex
+                      |
+		 training_set
+
+	   base_case_0   base_case_1
+	           \      /
+                    \    /
+                     root
+		     
+    The offsets for the links up from the root to the base cases are unused because the get_super_links()
+    function performs some magic and matches the base cases to the given occ every way that they agree.
+    
+    The base cases are not connected to the training set until the first event is added.  When an event
+    is added they are manually linked from a base case to the training set and then those links are corrected
+    when we call the relink() function. But the reset_links() function does not operate correctly if
+    there is not *some* link from the base cases to the training set.
+    
+    The training set cannot do double duty as the apex node because the offset from the apex to the training
+    set is used to establish the location of the training set in absolute time, which allows us to add events
+    to the training set.
+   */
+  apex = new node();
+  training_set = new node();
+  base_case_0 = new node();
+  base_case_1 = new node();
+  root = new node();
+
+  base_case_0.patt.p.push_back(0);
+  base_case_1.patt.p.push_back(1);
+
+  apex.reset_sub_link(training_set, 0);
+  training_set.reset_super_link(apex, 0);
+  root.reset_super_link(base_case_0, 0);
+  base_case_0.reset_sub_link(root, 0);
+  root.reset_super_link(base_case_1, 0);
+  base_case_1.reset_sub_link(root, 0);
+}
+
+void model::~model() {
+  free_model_tree(root, get_new_visit_id());
+}
+
+void model::free_model_tree(model_node* p_current, unsigned visit_id) {
+  
 }
 
 void model::relink_common_subsections(const occurrence& occ1, const occurrence& occ2) {
@@ -110,16 +174,17 @@ void model::relink(const occurrence& occ, bool only_new = true) {
   find_context(root, occ, supers, subs, siblings, p_node, get_next_visit_id());
 
   if(p_node == NULL) {
-    p_node = new model_node;
+    p_node = new model_node();
     p_node->patt = get_pattern(occ);
-    p_node->count = 0.0;
-    p_node->last_visit_id = MAX_UINT;
   } else if(only_new)
     return; //This is an existing pattern and we are only relinking new ones
 
-  //Set the super, sub links
-  p_patt->super_links = supers;
-  p_patt->sub_links = subs;
+  //Remove existing links to and from this node
+  p_node->unlink();
+  
+  //Set the super, sub links  
+  p_node->super_links = supers;
+  p_node->sub_links = subs;
 
   //Make sure links in subs, supers back to this pattern are set correctly
   for(auto p_link = supers.begin();p_link != supers.end();p_link++)
