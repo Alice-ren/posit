@@ -8,6 +8,26 @@
 
 #include "pattern.hh"
 
+//event related functions
+bool operator<(const event& t1, const event& t2) {
+  if(t1.t == t2.t)
+    return t1.p < t2.p;
+  else
+    return t1.t < t2.t;
+}
+
+bool operator==(const event& t1, const event& t2) {
+  return (t1.t == t2.t && t1.p == t2.p);
+}
+
+bool operator!=(const event& t1, const event& t2) {
+  return (t1.t != t2.t || t1.p != t2.p);
+}
+
+void print_event(const event& e) {
+  cout << e.t << "->" << e.p;
+}
+
 //pattern related functions
 void print_pattern(const pattern& p) {
   std::cout << p.count << " of " << flush;
@@ -40,40 +60,74 @@ bool operator==(const pattern& p1, const pattern& p2) {
   return true;
 }
 
-//functions related to patterns and occurrences
-
-//Note: t_abs here refers to the absolute time to assign to the earliest event in the created occurrence.
-occurrence get_occurrence(const pattern& pat, int t_abs) {
-  occurrence occ;
-	
-  int t = t_abs;
-	
-  for(unsigned i = 0;i < pat.p.size();i++) {
-    event e;
-    e.t = t;
-    e.p = pat.p[i];
-    occ.push_back(e);
-		
-    if(i < pat.dt.size())
-      t += pat.dt[i];
-  }
-	
-  return occ;
+pattern subtract(const pattern &p, int t_offset, const pattern &sub_p); //Returns the events for which event is in p but not in sub_p
+bool is_sub(const pattern &p, int t_offset, const pattern &sub_p) {
+  return get_intersection(p, t_offset, sub_p) == sub_p;
 }
 
-pattern get_pattern(const occurrence& occ) {
-  pattern patt;
-  patt.count = 0;
-  for(unsigned i = 0;i < occ.size();i++) {
-    patt.p.push_back(occ[i].p);
-    if(i > 0)
-      patt.dt.push_back(occ[i].t - occ[i - 1].t);
-  }
-  return patt;
+bool is_compatible(const pattern& p1, int t_offset, const pattern& p2) {
+  return is_single_valued(get_union(p1, t_offset, p2));
 }
 
+//Assume: if we have 2 p's with an interval of zero between, they are in the order 0,1.
+//This condition is enforced as long as you don't directly access dt and p.
+pattern get_intersection(const pattern& p1, int t_offset, const pattern& p2) {
+  pattern result;
 
-//Functions related to matches
+  #define next_p1 0
+  #define next_p2 1
+  #define next_both 2
+  
+  unsigned i=0,j=0;
+  int pr_last_t=INT_MAX,p1_t=0,p2_t=t_offset;
+  unsigned action;
+  while(true) {
+    if(p1_t < p2_t)
+      action = next_p1;
+    else if(p2_t < p1_t)
+      action = next_p2;
+    else { //p1_t == p2_t
+      if(p1.p[i] < p2.p[j])
+	action = next_p1;
+      else if(p1.p[i] > p2.p[j])
+	action = next_p2;
+      else {
+	result.p.push_back(p1.p[i]);
+	if(pr_last_t != INT_MAX)
+	  result.dt.push_back(p1_t - pr_last_t);
+	pr_last_t = p1_t;
+	action = next_both;
+      }
+    }
+    if(action == next_p1) {
+      if(i < p1.dt.size()) {
+	p1_t += p1.dt[i];
+	i++;
+      } else
+	break;
+    } else if(action == next_p2) {
+      if(j < p2.dt.size()) {
+	p2_t += p2.dt[j];
+	j++;
+      } else
+	break;
+    } else if(action == next_both) {
+      if(i < p1.dt.size() && j < p2.dt.size()) {
+	p1_t += p1.dt[i];
+	p2_t += p2.dt[j];
+	i++;
+	j++;
+      } else
+	break;
+    }
+  }
+  
+  return result;
+}
+
+pattern get_union(const pattern& p1, int offset, const pattern& p2);
+bool is_single_valued(const pattern& p);
+void convolute(const pattern& p1, const pattern& p2, list<pattern>& patterns, list<int>& t_offset);
 
 
 //Helper function for convolute()
