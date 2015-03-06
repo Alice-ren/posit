@@ -30,19 +30,27 @@ using namespace std;
   i.e. P(ABC) = P(AB)P(BC)/P(B)
 */
 
+typedef struct {
+  int ub; //upper bound
+  int lb; //lower bound
+} t_bounds;
+
 class pattern {
 public:
-  vector<unsigned> p;
+  pattern(bool p) { this->p.push_back(p); }
+  vector<bool> p;
   vector<unsigned> dt;
 };
 
 void print_pattern(const pattern& p);
 void print_patterns(const list<pattern>& patterns);
 bool operator==(const pattern& p1, const pattern& p2);
-
-//functions related to patterns and occurrences
-occurrence get_occurrence(const pattern& pat, int t_abs);
-pattern get_pattern(const occurrence& occ);
-void convolute(const occurrence& occ1, const occurrence& occ2, list<pattern>& patterns, list<int>& t_offset);
+pattern subtract(const pattern &p, int t_offset, const pattern &sub_p); //Returns the events for which event is in p but not in sub_p
+bool is_sub(const pattern &p, int t_offset, const pattern &sub_p);
+bool is_compatible(const pattern& p1, int t_offset, const pattern& p2);
+pattern get_intersection(const pattern& p1, int t_offset, const pattern& p2);
+pattern get_union(const pattern& p1, int offset, const pattern& p2);
+bool is_single_valued(const pattern& p);
+void convolute(const pattern& p1, const pattern& p2, list<pattern>& patterns, list<int>& t_offset);
 
 #endif
