@@ -28,7 +28,70 @@ void print_event(const event& e) {
   cout << e.t << "->" << e.p;
 }
 
+//event_ptr related functions
+event_ptr::event_ptr(const pattern* p) {
+  p_patt = p;
+  i = 0;
+  t_abs = 0;
+}
+
+bool event_ptr::operator++() {
+  if(i < p_patt->p.size()) {
+    if(i < p_patt->dt.size())
+      t_abs += p_patt->dt[i];
+    
+    i++;
+    return true;
+  }
+  return false;
+}
+
+event event_ptr::event_at() {
+  event e;
+  if(i < p_patt->p.size()) {  //bounds checking: not for losers
+    e.p = p_patt->p[i];
+    e.t = t_abs;
+  }
+  return e;
+}
+
+bool event_ptr::at_end() {
+  return (i >= p_patt->p.size());
+}
+
 //pattern related functions
+pattern() {
+  //nothing to do
+}
+
+pattern::pattern(bool p) {
+  this->p.push_back(p);
+}
+
+void pattern::insert(bool p, int t_offset) {
+  int t_abs = 0;
+  for(unsigned i = 0;i < p.size();i++) {
+    if(i > 0)
+      t_abs += dt[i - 1];
+  }
+
+  if(i < p.size()) {
+    //insert
+    if(i > 0) {
+      int 
+
+    } else {
+
+    }
+  } else {
+    
+  }
+}
+
+event_ptr pattern::begin() {
+  return event_ptr(this);
+}
+
 void print_pattern(const pattern& p) {
   std::cout << p.count << " of " << flush;
   for(unsigned i=0;i < p.p.size();i++) {
