@@ -35,11 +35,42 @@ typedef struct {
   int lb; //lower bound
 } t_bounds;
 
+//An event is a complete piece of data as it is received, not abstracted as a pattern, comprised as a position p
+//(which can be thought of as an event type, since we do not assume position shift invariance) taking place at some time t.
+typedef struct {
+  bool p;
+  int t;
+} event;
+
+bool operator<(const event& t1, const event& t2);
+bool operator==(const event& t1, const event& t2);
+bool operator!=(const event& t1, const event& t2);
+void print_event(const event& e);
+
+class event_ptr;
 class pattern {
 public:
+  pattern();
   pattern(bool p) { this->p.push_back(p); }
+  void insert(bool p, int t_offset);
+  event_ptr begin();
+private:
   vector<bool> p;
   vector<unsigned> dt;
+  friend class event_ptr;
+};
+
+class event_ptr {
+public:
+  bool operator++();
+  event event_at();
+  bool at_end();
+private:
+  event_ptr(const pattern* p);
+  pattern* p_patt;
+  unsigned i;
+  int t_abs;
+  friend class pattern;
 };
 
 void print_pattern(const pattern& p);
