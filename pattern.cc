@@ -29,10 +29,21 @@ void print_event(const event& e) {
 }
 
 //event_ptr related functions
-event_ptr::event_ptr(const pattern* p) {
+event_ptr::event_ptr(const pattern* p, int t_offset) {
   p_patt = p;
   i = 0;
-  t_abs = 0;
+  t_abs = t_offset;
+}
+
+event_ptr::event_ptr(const pattern* p, bool end) {
+  if(end) {
+    p_patt = p;
+    i = p_patt->p.size();
+  } else {
+    p_patt = p;
+    i = 0;
+    t_abs = 0;
+  }
 }
 
 bool event_ptr::operator++() {
@@ -46,20 +57,33 @@ bool event_ptr::operator++() {
   return false;
 }
 
-event event_ptr::event_at() {
+event event_ptr::operator*() const {
   event e;
   if(i < p_patt->p.size()) {  //bounds checking: not for losers
     e.p = p_patt->p[i];
     e.t = t_abs;
-  }
+  } else
+    cout << "ERROR: tried to access past end of pattern.\n";
+  
   return e;
 }
 
-bool event_ptr::at_end() {
-  return (i >= p_patt->p.size());
+event event_ptr::operator->() const {
+  return (*(*this));
 }
 
-//pattern related functions
+bool operator==(const event_ptr& p1, const event_ptr& p2) {
+  if(p1.p_patt != p2.p_patt)
+    cout << "ERROR: tried to compare two event_ptr objects from different patterns.\n";
+
+  return p1.i == p2.i;
+}
+
+bool operator!=(const event_ptr& p1, const event_ptr& p2) {
+  return !(p1 == p2);
+}
+
+//pattern class member functions
 pattern() {
   //nothing to do
 }
@@ -68,62 +92,103 @@ pattern::pattern(bool p) {
   this->p.push_back(p);
 }
 
-void pattern::insert(bool p, int t_offset) {
-  int t_abs = 0;
-  for(unsigned i = 0;i < p.size();i++) {
-    if(i > 0)
-      t_abs += dt[i - 1];
-  }
-
-  if(i < p.size()) {
-    //insert
-    if(i > 0) {
-      int 
-
-    } else {
-
-    }
-  } else {
-    
-  }
+event_ptr pattern::begin(int t_offset) const {
+  return event_ptr(this, t_offset);
 }
 
-event_ptr pattern::begin() {
-  return event_ptr(this);
+event_ptr pattern::end() const {
+  return event_ptr(this, true);
+}
+
+void pattern::append(bool pos, unsigned dt = 0) {
+  p.push_back(pos);
+  if(p.size() > 0)
+    dt.push_back(dt);
+}
+
+int pattern::size() const {
+  return p.size();
+}
+
+bool pattern::empty() const {
+  return p.empty();
+}
+
+int pattern::width() const {
+  int w = 0;
+  for(unsigned i : dt)
+    w += i;
+
+  return w;
+}
+
+//functions operating on patterns
+pattern insert(const pattern& patt, bool p, int t_offset) {
+  return get_union(patt, t_offset, pattern(p));
 }
 
 void print_pattern(const pattern& p) {
-  std::cout << p.count << " of " << flush;
-  for(unsigned i=0;i < p.p.size();i++) {
-    std::cout << p.p[i];
-    if(i < p.dt.size())
-      std::cout << " -" << p.dt[i] << "- " << flush;
-  }
-  std::cout << endl << flush;
+  for(event e : p)
+    cout << "(" << e.t << ":" << e.p << ") ";
+    
+  cout << endl << flush;
 }
 
 void print_patterns(const list<pattern>& patterns) {
   std::cout << "patterns: " << endl;
-  for(list<pattern>::const_iterator p_patt=patterns.begin();p_patt != patterns.end();p_patt++)
-    print_pattern(*p_patt);
+  for(const pattern &p : patterns)
+    print_pattern(p);
 }
 
 bool operator==(const pattern& p1, const pattern& p2) {
-  if(p1.p.size() != p2.p.size() || p1.dt.size() != p2.dt.size())
+  if(p1.size() != p2.size())
     return false;
-	
-  for(unsigned i=0;i<p1.p.size();i++) {
-    if(p1.p[i] != p2.p[i])
+
+  event_ptr p_e1 = p1.begin();
+  event_ptr p_e2 = p2.begin();
+  while(p_e1 != p1.end() && p_e2 != p2.end()) {
+    if(*p_e1 != *p_e2)
       return false;
-  }
-  for(unsigned i=0;i<p1.dt.size();i++) {
-    if(p1.dt[i] != p2.dt[i])
-      return false;
+    p_e1++;
+    p_e2++;
   }
   return true;
 }
 
-pattern subtract(const pattern &p, int t_offset, const pattern &sub_p); //Returns the events for which event is in p but not in sub_p
+bool operator!=(const pattern& p1, const pattern& p2) {
+  return !(p1 == p2);
+}
+
+//FIXME: There are such striking similarities between the implementations of get_union, get_intersection and subtract that it would be
+//easy enough to write a single function to do them all with a lambda defining the behavior or a constant.
+pattern subtract(const pattern &p, int t_offset, const pattern &sub_p, int& result_offset) { //Returns the events for which event is in p but not in sub_p
+  pattern result;
+  result_offset = INT_MAX;
+  
+  int last_t = 0;
+  event_ptr p_e1=p.begin(), p_e2=sub_p.begin(t_offset);
+  while(p_e1 != p1.end()) {
+    if((p_e2 == p2.end()) || (*p_e1 < *p_e2)) {
+      result.append((*p_e1).p, (*p_e1).t - last_t);
+      last_t = (*p_e1).t;
+      p_e1++;
+      if(result_offset == INT_MAX)
+	result_offset = last_t;
+    } else if(*p_e2 < *p_e1) {
+      p_e2++;
+    } else {
+      p_e1++;
+      p_e2++;
+    }
+  }
+
+  return result;
+}
+pattern subtract(const pattern &p, int t_offset, const pattern &sub_p) { int dummy; return subtract(p, t_offset, sub_p, dummy); }
+
+bool is_sub(const pattern &p, int t_offset, const pattern &sub_p, int& result_offset) {
+  return get_intersection(p, t_offset, sub_p, result_offset) == sub_p;
+}
 bool is_sub(const pattern &p, int t_offset, const pattern &sub_p) {
   return get_intersection(p, t_offset, sub_p) == sub_p;
 }
@@ -132,119 +197,108 @@ bool is_compatible(const pattern& p1, int t_offset, const pattern& p2) {
   return is_single_valued(get_union(p1, t_offset, p2));
 }
 
-//Assume: if we have 2 p's with an interval of zero between, they are in the order 0,1.
-//This condition is enforced as long as you don't directly access dt and p.
-pattern get_intersection(const pattern& p1, int t_offset, const pattern& p2) {
-  pattern result;
+//FIXME not right.. t_offset of the union is not right
+pattern get_xor(const pattern& p1, int t_offset, const pattern& p2, int& result_offset) {
+  int sub1_offset, sub2_offset;
+  pattern sub1 = subtract(p1, t_offset, p2, sub1_offset);
+  pattern sub2 = subtract(p2, -t_offset, p1, sub2_offset);
+  return get_union(sub1, sub2_offset - sub1_offset, sub2);
+}
+pattern get_xor(const pattern& p1, int t_offset, const pattern& p2, int& result_offset) { int dummy; return get_xor(p1, t_offset, p2, dummy); }
 
-  #define next_p1 0
-  #define next_p2 1
-  #define next_both 2
+pattern get_intersection(const pattern& p1, int t_offset, const pattern& p2, int& result_offset) {
+  pattern result;
+  result_offset = INT_MAX;
   
-  unsigned i=0,j=0;
-  int pr_last_t=INT_MAX,p1_t=0,p2_t=t_offset;
-  unsigned action;
-  while(true) {
-    if(p1_t < p2_t)
-      action = next_p1;
-    else if(p2_t < p1_t)
-      action = next_p2;
-    else { //p1_t == p2_t
-      if(p1.p[i] < p2.p[j])
-	action = next_p1;
-      else if(p1.p[i] > p2.p[j])
-	action = next_p2;
-      else {
-	result.p.push_back(p1.p[i]);
-	if(pr_last_t != INT_MAX)
-	  result.dt.push_back(p1_t - pr_last_t);
-	pr_last_t = p1_t;
-	action = next_both;
-      }
-    }
-    if(action == next_p1) {
-      if(i < p1.dt.size()) {
-	p1_t += p1.dt[i];
-	i++;
-      } else
-	break;
-    } else if(action == next_p2) {
-      if(j < p2.dt.size()) {
-	p2_t += p2.dt[j];
-	j++;
-      } else
-	break;
-    } else if(action == next_both) {
-      if(i < p1.dt.size() && j < p2.dt.size()) {
-	p1_t += p1.dt[i];
-	p2_t += p2.dt[j];
-	i++;
-	j++;
-      } else
-	break;
+  int last_t = 0;
+  event_ptr p_e1=p1.begin(), p_e2=p2.begin(t_offset);
+  while(p_e1 != p1.end() && p_e2 != p2.end()) {
+    if(*p_e1 < *p_e2) {
+      p_e1++;
+    } else if(*p_e2 < *p_e1) {
+      p_e2++;
+    } else {
+      result.append((*p_e1).p, (*p_e1).t - last_t);
+      last_t = (*p_e1).t;
+      if(result_offset == INT_MAX)
+	result_offset = last_t;
+      p_e1++;
+      p_e2++;
     }
   }
-  
+
+  return result;
+}
+pattern get_intersection(const pattern& p1, int t_offset, const pattern& p2) { int dummy; return get_intersection(p1, t_offset, p2, dummy); }
+
+pattern get_union(const pattern& p1, int offset, const pattern& p2) {
+  pattern result;
+	
+  int last_t = 0;
+  event_ptr p_e1=p1.begin(), p_e2=p2.begin(t_offset);
+  while(p_e1 != p1.end() || p_e2 != p2.end()) {
+    if((p_e2 == p2.end()) || (p_e1 != p1.end() && *p_e1 < *p_e2)) {
+      result.append((*p_e1).p, (*p_e1).t - last_t);
+      last_t = (*p_e1).t;
+      p_e1++;
+    } else if((p_e1 == p1.end()) || (*p_e2 < *p_e1)) {
+      result.append((*p_e2).p, (*p_e2).t - last_t);
+      last_t = (*p_e2).t;
+      p_e2++;
+    } else { //they are equal - add one but not the other and get the next of both
+      result.append((*p_e2).p, (*p_e2).t - last_t);
+      last_t = (*p_e2).t;
+      p_e1++;
+      p_e2++;
+    }
+  }
+
   return result;
 }
 
-pattern get_union(const pattern& p1, int offset, const pattern& p2);
-bool is_single_valued(const pattern& p);
-void convolute(const pattern& p1, const pattern& p2, list<pattern>& patterns, list<int>& t_offset);
+bool is_single_valued(const pattern& p) {
+  return (find(p.dt.begin(), p.dt.end(), 0) == p.dt.end());
+}
 
 
 //Helper function for convolute()
 //Return the minimum dt we can add to an the elements of occ1 such that at least one event matches exactly.
 //Does not return dt=0
-int min_dt(const occurrence& occ1, const occurrence& occ2) {
-  //Assume: occ1 and occ2 are sorted by time
+int min_dt(const pattern& p1, int t_offset, const pattern& p2) {
   int min_dt = INT_MAX;
-  if(occ2[occ2.size() - 1].t < occ1[0].t) {
-    unsigned i=0,j=0;
-    while(i < occ1.size() && j < occ2.size()) {
-      if(occ1[i].t < occ2[j].t) {
-	for(unsigned k=j;(k < occ2.size()) && (occ2[k].t - occ1[i].t < min_dt);k++) {
-	  if(occ1[i].p == occ2[k].p) {
-	    min_dt = occ2[k].t - occ1[i].t;
-	    break;
-	  }
+  event_ptr p_e1=p1.begin(), p_e2=p2.begin(t_offset);  
+  while(p_e1 != p1.end() && p_e2 != p2.end()) {
+    if(p_e1->t < p_e2->t) {
+      for(event_ptr p_e2_match = p_e2;(p_e2_match != p2.end()) && (p_e2_match->t - p_e1->t < min_dt);p_e2++) {
+	if(p_e1->p == p_e2_match->p) {
+	  min_dt = p_e2_match->t - p_e1->t;
+	  break;
 	}
-	i++;
-      } else
-	j++;
-    }
+      }
+      p_e1++;
+    } else
+      p_e2++;
   }
   return min_dt;
 }
 
-//FIXME: handle corner case where time delta of occ1 and occ2 adds up to more than INT_MAX
-void convolute(const occurrence& occ1, const occurrence& occ2, list<pattern>& patterns, list<int>& t_offset);
-{
-  if(occ1.empty() || occ2.empty())
+void convolute(const pattern& p1, const pattern& p2, list<pattern>& result, list<int>& result_offset) {
+  if(p1.empty() || p2.empty())
     return;
   
-  //Assume: the elements of occ1, occ2 are sorted by time.
-  occ1 = get_occurrence(get_pattern(occ1), -INT_MAX); //rebase to avoid as many overflow issues as possible
-  int t = occ1[occ1.size() - 1] + 1;
-  pattern patt = get_pattern(occ2);
-  occurrence shifted_occ = get_occurrence(patt, t); //initialize to just out of range
-  
+  int t_offset = width(p1) + 1;
   while(true) {
-    int dt = min_dt(occ, shifted_occ);
+    int dt = min_dt(p1, t_offset, p2);
     if(dt != INT_MAX)
       t -= dt;
     else
       return;
 
-    shifted_occ = get_occurrence(patt, t);
-    occurrence intersect_occ = get_intersection(occ1, shifted_occ);
-    if(!intersect_occ.empty()) {
-      patterns.push_back(get_pattern(intersect_occ));
-      t_offset.push_back(intersect_occ[0].t + INT_MAX); //x - occ1[0].t == x + INT_MAX
-    }
-    else
-      cout << "ERROR: intersection should not be empty if min_dt != INT_MAX\n";
+    int intersect_offset;
+    pattern intersect = get_intersection(p1, t_offset, p2, intersect_offset);
+    patterns.push_back(intersect);
+    result_offset.push_back(intersect_offset);
   }
 }
-
+void convolute(const pattern& p1, const pattern& p2, list<pattern>& result, list<int>& result_offset) { list<int> dummy; convolute(p1, p2, result, dummy); }
 

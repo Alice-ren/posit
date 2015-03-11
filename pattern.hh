@@ -47,41 +47,54 @@ bool operator==(const event& t1, const event& t2);
 bool operator!=(const event& t1, const event& t2);
 void print_event(const event& e);
 
-class event_ptr;
-class pattern {
-public:
-  pattern();
-  pattern(bool p) { this->p.push_back(p); }
-  void insert(bool p, int t_offset);
-  event_ptr begin();
-private:
-  vector<bool> p;
-  vector<unsigned> dt;
-  friend class event_ptr;
-};
-
+class pattern;
 class event_ptr {
 public:
+  event_ptr(const pattern* p, int t_offset = 0)
+  event_ptr(const pattern* p, bool end);
   bool operator++();
-  event event_at();
-  bool at_end();
+  event operator*() const;
+  event operator->() const;
 private:
-  event_ptr(const pattern* p);
   pattern* p_patt;
   unsigned i;
   int t_abs;
-  friend class pattern;
+};
+bool operator!=(const event_ptr& p1, const event_ptr& p2);
+bool operator==(const event_ptr& p1, const event_ptr& p2);
+
+class pattern {
+public:
+  pattern();
+  pattern(bool p);
+  void append(bool p, unsigned dt);
+  event_ptr begin(int offset = 0) const;
+  event_ptr end() const;
+  int size() const;
+  bool empty() const;
+  int width() const;
+  vector<bool> p;
+  vector<unsigned> dt;
 };
 
+pattern insert(const pattern& patt, bool p, int t_offset);
 void print_pattern(const pattern& p);
 void print_patterns(const list<pattern>& patterns);
 bool operator==(const pattern& p1, const pattern& p2);
+bool operator!=(const pattern& p1, const pattern& p2);
 pattern subtract(const pattern &p, int t_offset, const pattern &sub_p); //Returns the events for which event is in p but not in sub_p
+pattern subtract(const pattern &p, int t_offset, const pattern &sub_p, int& result_offset); //Returns the events for which event is in p but not in sub_p
 bool is_sub(const pattern &p, int t_offset, const pattern &sub_p);
+bool is_sub(const pattern &p, int t_offset, const pattern &sub_p, int& result_offset);
 bool is_compatible(const pattern& p1, int t_offset, const pattern& p2);
+pattern get_xor(const pattern& p1, int t_offset, const pattern& p2);
+pattern get_xor(const pattern& p1, int t_offset, const pattern& p2, int& result_offset);
 pattern get_intersection(const pattern& p1, int t_offset, const pattern& p2);
+pattern get_intersection(const pattern& p1, int t_offset, const pattern& p2, int& result_offset);
 pattern get_union(const pattern& p1, int offset, const pattern& p2);
+pattern get_union(const pattern& p1, int offset, const pattern& p2, int& result_offset);
 bool is_single_valued(const pattern& p);
-void convolute(const pattern& p1, const pattern& p2, list<pattern>& patterns, list<int>& t_offset);
+void convolute(const pattern& p1, const pattern& p2, list<pattern>& result, list<int>& result_offset);
+void convolute(const pattern& p1, const pattern& p2, list<pattern>& result);
 
 #endif
