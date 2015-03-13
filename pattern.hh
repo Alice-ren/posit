@@ -7,7 +7,7 @@
 #include <list>
 #include <iostream>
 #include <climits>
-#include "occurrence.hh"
+#include <algorithm>
 using namespace std;
 
 #ifndef PATTERN
@@ -50,15 +50,17 @@ void print_event(const event& e);
 class pattern;
 class event_ptr {
 public:
-  event_ptr(const pattern* p, int t_offset = 0)
+  event_ptr(const pattern* p, int t_offset = 0);
   event_ptr(const pattern* p, bool end);
   bool operator++();
   event operator*() const;
-  event operator->() const;
+  //  event operator->() const;  current g++ does not allow this; ->() must return a pointer to an lvalue
 private:
-  pattern* p_patt;
+  const pattern* p_patt;
   unsigned i;
   int t_abs;
+  friend bool operator!=(const event_ptr& p1, const event_ptr& p2);
+  friend bool operator==(const event_ptr& p1, const event_ptr& p2);
 };
 bool operator!=(const event_ptr& p1, const event_ptr& p2);
 bool operator==(const event_ptr& p1, const event_ptr& p2);
@@ -67,7 +69,8 @@ class pattern {
 public:
   pattern();
   pattern(bool p);
-  void append(bool p, unsigned dt);
+  void append(bool p, unsigned delta_t);
+  void insert(bool p, int t_offset);
   event_ptr begin(int offset = 0) const;
   event_ptr end() const;
   int size() const;
@@ -77,7 +80,6 @@ public:
   vector<unsigned> dt;
 };
 
-pattern insert(const pattern& patt, bool p, int t_offset);
 void print_pattern(const pattern& p);
 void print_patterns(const list<pattern>& patterns);
 bool operator==(const pattern& p1, const pattern& p2);
@@ -91,10 +93,10 @@ pattern get_xor(const pattern& p1, int t_offset, const pattern& p2);
 pattern get_xor(const pattern& p1, int t_offset, const pattern& p2, int& result_offset);
 pattern get_intersection(const pattern& p1, int t_offset, const pattern& p2);
 pattern get_intersection(const pattern& p1, int t_offset, const pattern& p2, int& result_offset);
-pattern get_union(const pattern& p1, int offset, const pattern& p2);
-pattern get_union(const pattern& p1, int offset, const pattern& p2, int& result_offset);
+pattern get_union(const pattern& p1, int t_offset, const pattern& p2);
+pattern get_union(const pattern& p1, int t_offset, const pattern& p2, int& result_offset);
 bool is_single_valued(const pattern& p);
-void convolute(const pattern& p1, const pattern& p2, list<pattern>& result, list<int>& result_offset);
-void convolute(const pattern& p1, const pattern& p2, list<pattern>& result);
+void convolute(const pattern& p1, const pattern& p2, list<pattern>& result, list<int>& result_offset, int min_size = 2);
+void convolute(const pattern& p1, const pattern& p2, list<pattern>& result, int min_size = 2);
 
 #endif

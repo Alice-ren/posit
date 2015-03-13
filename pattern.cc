@@ -1,9 +1,6 @@
 /*****
       pattern.cc
-      Defines patterns and occurrences and operations on the two
-      To Do:
-      -move p[], dt[] into a class called pattern
-      -create model_node and mn_link and move the associated functions into model.cc
+      Defines patterns and operations on patterns
 ******/
 
 #include "pattern.hh"
@@ -25,7 +22,7 @@ bool operator!=(const event& t1, const event& t2) {
 }
 
 void print_event(const event& e) {
-  cout << e.t << "->" << e.p;
+  cout << "(" << e.t << ":" << e.p << ") ";
 }
 
 //event_ptr related functions
@@ -68,10 +65,6 @@ event event_ptr::operator*() const {
   return e;
 }
 
-event event_ptr::operator->() const {
-  return (*(*this));
-}
-
 bool operator==(const event_ptr& p1, const event_ptr& p2) {
   if(p1.p_patt != p2.p_patt)
     cout << "ERROR: tried to compare two event_ptr objects from different patterns.\n";
@@ -84,7 +77,7 @@ bool operator!=(const event_ptr& p1, const event_ptr& p2) {
 }
 
 //pattern class member functions
-pattern() {
+pattern::pattern() {
   //nothing to do
 }
 
@@ -100,10 +93,14 @@ event_ptr pattern::end() const {
   return event_ptr(this, true);
 }
 
-void pattern::append(bool pos, unsigned dt = 0) {
-  p.push_back(pos);
+void pattern::append(bool pos, unsigned delta_t = 0) {
   if(p.size() > 0)
-    dt.push_back(dt);
+    dt.push_back(delta_t);
+  p.push_back(pos);
+}
+
+void pattern::insert(bool p, int t_offset) {
+  (*this) = get_union(*this, t_offset, pattern(p));
 }
 
 int pattern::size() const {
@@ -123,13 +120,11 @@ int pattern::width() const {
 }
 
 //functions operating on patterns
-pattern insert(const pattern& patt, bool p, int t_offset) {
-  return get_union(patt, t_offset, pattern(p));
-}
+
 
 void print_pattern(const pattern& p) {
   for(event e : p)
-    cout << "(" << e.t << ":" << e.p << ") ";
+    print_event(e);
     
   cout << endl << flush;
 }
@@ -149,8 +144,8 @@ bool operator==(const pattern& p1, const pattern& p2) {
   while(p_e1 != p1.end() && p_e2 != p2.end()) {
     if(*p_e1 != *p_e2)
       return false;
-    p_e1++;
-    p_e2++;
+    ++p_e1;
+    ++p_e2;
   }
   return true;
 }
@@ -167,20 +162,23 @@ pattern subtract(const pattern &p, int t_offset, const pattern &sub_p, int& resu
   
   int last_t = 0;
   event_ptr p_e1=p.begin(), p_e2=sub_p.begin(t_offset);
-  while(p_e1 != p1.end()) {
-    if((p_e2 == p2.end()) || (*p_e1 < *p_e2)) {
+  while(p_e1 != p.end()) {
+    if((p_e2 == sub_p.end()) || (*p_e1 < *p_e2)) {
       result.append((*p_e1).p, (*p_e1).t - last_t);
       last_t = (*p_e1).t;
-      p_e1++;
+      ++p_e1;
       if(result_offset == INT_MAX)
 	result_offset = last_t;
     } else if(*p_e2 < *p_e1) {
-      p_e2++;
+      ++p_e2;
     } else {
-      p_e1++;
-      p_e2++;
+      ++p_e1;
+      ++p_e2;
     }
   }
+
+  if(result_offset == INT_MAX)
+    result_offset = 0; //This means the result is empty anyway but why return a wierd number, it looks like a bug.
 
   return result;
 }
@@ -204,7 +202,7 @@ pattern get_xor(const pattern& p1, int t_offset, const pattern& p2, int& result_
   pattern sub2 = subtract(p2, -t_offset, p1, sub2_offset);
   return get_union(sub1, sub2_offset - sub1_offset, sub2);
 }
-pattern get_xor(const pattern& p1, int t_offset, const pattern& p2, int& result_offset) { int dummy; return get_xor(p1, t_offset, p2, dummy); }
+pattern get_xor(const pattern& p1, int t_offset, const pattern& p2) { int dummy; return get_xor(p1, t_offset, p2, dummy); }
 
 pattern get_intersection(const pattern& p1, int t_offset, const pattern& p2, int& result_offset) {
   pattern result;
@@ -214,24 +212,27 @@ pattern get_intersection(const pattern& p1, int t_offset, const pattern& p2, int
   event_ptr p_e1=p1.begin(), p_e2=p2.begin(t_offset);
   while(p_e1 != p1.end() && p_e2 != p2.end()) {
     if(*p_e1 < *p_e2) {
-      p_e1++;
+      ++p_e1;
     } else if(*p_e2 < *p_e1) {
-      p_e2++;
+      ++p_e2;
     } else {
       result.append((*p_e1).p, (*p_e1).t - last_t);
       last_t = (*p_e1).t;
       if(result_offset == INT_MAX)
 	result_offset = last_t;
-      p_e1++;
-      p_e2++;
+      ++p_e1;
+      ++p_e2;
     }
   }
 
+  if(result_offset == INT_MAX)
+    result_offset = 0; //This means the result is empty anyway but why return a wierd number, it looks like a bug.
+  
   return result;
 }
 pattern get_intersection(const pattern& p1, int t_offset, const pattern& p2) { int dummy; return get_intersection(p1, t_offset, p2, dummy); }
 
-pattern get_union(const pattern& p1, int offset, const pattern& p2) {
+pattern get_union(const pattern& p1, int t_offset, const pattern& p2) {
   pattern result;
 	
   int last_t = 0;
@@ -240,16 +241,16 @@ pattern get_union(const pattern& p1, int offset, const pattern& p2) {
     if((p_e2 == p2.end()) || (p_e1 != p1.end() && *p_e1 < *p_e2)) {
       result.append((*p_e1).p, (*p_e1).t - last_t);
       last_t = (*p_e1).t;
-      p_e1++;
+      ++p_e1;
     } else if((p_e1 == p1.end()) || (*p_e2 < *p_e1)) {
       result.append((*p_e2).p, (*p_e2).t - last_t);
       last_t = (*p_e2).t;
-      p_e2++;
+      ++p_e2;
     } else { //they are equal - add one but not the other and get the next of both
       result.append((*p_e2).p, (*p_e2).t - last_t);
       last_t = (*p_e2).t;
-      p_e1++;
-      p_e2++;
+      ++p_e1;
+      ++p_e2;
     }
   }
 
@@ -257,7 +258,7 @@ pattern get_union(const pattern& p1, int offset, const pattern& p2) {
 }
 
 bool is_single_valued(const pattern& p) {
-  return (find(p.dt.begin(), p.dt.end(), 0) == p.dt.end());
+  return (find(p.dt.begin(), p.dt.end(), unsigned(0)) == p.dt.end());
 }
 
 
@@ -268,37 +269,39 @@ int min_dt(const pattern& p1, int t_offset, const pattern& p2) {
   int min_dt = INT_MAX;
   event_ptr p_e1=p1.begin(), p_e2=p2.begin(t_offset);  
   while(p_e1 != p1.end() && p_e2 != p2.end()) {
-    if(p_e1->t < p_e2->t) {
-      for(event_ptr p_e2_match = p_e2;(p_e2_match != p2.end()) && (p_e2_match->t - p_e1->t < min_dt);p_e2++) {
-	if(p_e1->p == p_e2_match->p) {
-	  min_dt = p_e2_match->t - p_e1->t;
+    if((*p_e1).t < (*p_e2).t) {
+      for(event_ptr p_e2_match = p_e2;(p_e2_match != p2.end()) && ((*p_e2_match).t - (*p_e1).t < min_dt);++p_e2_match) {
+	if((*p_e1).p == (*p_e2_match).p) {
+	  min_dt = (*p_e2_match).t - (*p_e1).t;
 	  break;
 	}
       }
-      p_e1++;
+      ++p_e1;
     } else
-      p_e2++;
+      ++p_e2;
   }
   return min_dt;
 }
 
-void convolute(const pattern& p1, const pattern& p2, list<pattern>& result, list<int>& result_offset) {
+void convolute(const pattern& p1, const pattern& p2, list<pattern>& result, list<int>& result_offset, int min_size) {
   if(p1.empty() || p2.empty())
     return;
   
-  int t_offset = width(p1) + 1;
+  int t_offset = p1.width() + 1;
   while(true) {
     int dt = min_dt(p1, t_offset, p2);
     if(dt != INT_MAX)
-      t -= dt;
+      t_offset -= dt;
     else
       return;
 
     int intersect_offset;
     pattern intersect = get_intersection(p1, t_offset, p2, intersect_offset);
-    patterns.push_back(intersect);
-    result_offset.push_back(intersect_offset);
+    if(intersect.size() >= min_size) {
+      result.push_back(intersect);
+      result_offset.push_back(intersect_offset);
+    }
   }
 }
-void convolute(const pattern& p1, const pattern& p2, list<pattern>& result, list<int>& result_offset) { list<int> dummy; convolute(p1, p2, result, dummy); }
+void convolute(const pattern& p1, const pattern& p2, list<pattern>& result, int min_size) { list<int> dummy; convolute(p1, p2, result, dummy, min_size); }
 
