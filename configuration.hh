@@ -22,7 +22,9 @@ public:
   void choose_complement();
   double next_event_cond_prob() const;
   event next_event() const;
-  void predict(unsigned max_events, double predict_time_limit, function<completion_set(pattern)> get_first_order_completions);
+  bool next_event_ready() const;
+  void predict(unsigned max_events, double predict_time_limit, function<completion_set(const pattern&)> get_first_order_completions);
+  void display_contents();
 private:
   config_node* root_node;
   config_node* fulcrum_node;

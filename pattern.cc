@@ -125,8 +125,6 @@ int pattern::width() const {
 void print_pattern(const pattern& p) {
   for(event e : p)
     print_event(e);
-    
-  cout << endl << flush;
 }
 
 void print_patterns(const list<pattern>& patterns) {

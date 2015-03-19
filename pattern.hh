@@ -35,12 +35,21 @@ typedef struct {
   int lb; //lower bound
 } t_bounds;
 
+typedef struct {
+  int t_offset;
+  double event_prob;
+  double complement_prob;
+} completion_set;
+
 //An event is a complete piece of data as it is received, not abstracted as a pattern, comprised as a position p
 //(which can be thought of as an event type, since we do not assume position shift invariance) taking place at some time t.
-typedef struct {
+class event {
+public:
+  event() {}
+  event(int t, bool p) { this->t = t; this->p = p; }
   bool p;
   int t;
-} event;
+};
 
 bool operator<(const event& t1, const event& t2);
 bool operator==(const event& t1, const event& t2);

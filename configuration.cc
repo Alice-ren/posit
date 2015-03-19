@@ -11,11 +11,11 @@ public:
   config_node(config_node* super, double prob, event e) {
     if(super == NULL && e.t != 0)
       cout << "ERROR: first event in configuration space not at t=0";      
-      
+    
     this->super = super;
     sub_given = NULL;
     sub_complement = NULL;
-    this->prob = prob;
+    this->last_calculated_prob = prob;
     prob_needs_update = false;
     this->e = e;
   }
@@ -28,10 +28,10 @@ public:
   }
 
   bool expanded() const {
-    return (node->sub_given != NULL && node->sub_complement != NULL);
+    return (sub_given != NULL && sub_complement != NULL);
   }
 
-  invalidate_prob() {
+  void invalidate_prob() {
     prob_needs_update = true;
     if(super != NULL)
       super->invalidate_prob();
@@ -52,23 +52,23 @@ public:
   }
   
   //Note the assumption that the first event is at t=0 and all other events have t_offset relative to that
-  occurrence givens() const { //Not the most efficient way to write this
+  pattern givens() const { //Not the most efficient way to write this
     if(super != NULL)
-      return get_union(super.givens(), e.t, pattern(e.p));
+      return get_union(super->givens(), e.t, pattern(e.p));
     else
       return pattern(e.p);
   }
 
   double prob() {
     if(prob_needs_update) {
-      prob = 0.0; //so there is no path where prob is undefined
+      last_calculated_prob = 0.0; //so there is no path where prob is undefined
       if(expanded())
-	prob = sub_given->prob() + sub_complement->prob();
+	last_calculated_prob = sub_given->prob() + sub_complement->prob();
       
       prob_needs_update = false;
     }
   
-    return prob;
+    return last_calculated_prob;
   }
 
   double sub_event_cond_prob() { //returns the conditional probability of the topmost event in the tree.
@@ -96,8 +96,9 @@ public:
   config_node* choose_complement() {
     if(expanded()) {
       sub_given->free_subs();
-      sub_given->prob = 0.0;
+      sub_given->last_calculated_prob = 0.0;
       sub_given->prob_needs_update = false;
+      invalidate_prob();
       return sub_complement;
     }
     return NULL;
@@ -107,14 +108,20 @@ public:
   config_node* choose_event() {
     if(expanded()) {
       sub_complement->free_subs();
-      sub_complement->prob = 0.0;
+      sub_complement->last_calculated_prob = 0.0;
       sub_complement->prob_needs_update = false;
+      invalidate_prob();
       return sub_given;
     }
     return NULL;
   }
 
-  config_node* highest_probability_leaf_node(double &current_best = 0.0) {
+  config_node* highest_probability_leaf_node() { //dummy so that we can have a reference to a default value
+    double best = 0.0;
+    return highest_probability_leaf_node(best);
+  }
+  
+  config_node* highest_probability_leaf_node(double &current_best) {
     if(prob() < current_best)
       return NULL;
     else {
@@ -123,7 +130,7 @@ public:
 	config_node* given_best_node = sub_given->highest_probability_leaf_node(current_best);
 	if(given_best_node != NULL)
 	  best_node = given_best_node;
-	config_node* excl_best_node = sub_given->highest_probability_leaf_node(current_best);
+	config_node* excl_best_node = sub_complement->highest_probability_leaf_node(current_best);
 	if(excl_best_node != NULL)
 	  best_node = excl_best_node;
 	
@@ -136,18 +143,19 @@ public:
     }
   }
 
-  void configuration::print(unsigned tab_layers) {
+  void print(unsigned tab_layers = 0) {
     if(expanded())
       cout << "-->";
     else
       cout << "   ";
   
-    cout << setw(10) << prob() << " " << setw(10) << quality << "\t";
+    cout << setw(12) << prob() << "\t";
+    cout << "Given:\t";
     for(unsigned i = 0;i < tab_layers;i++)
       cout << "\t";
-    cout << "Given: " << endl;
     print_pattern(givens());
-  
+    cout << endl;
+    
     if(expanded()) {
       sub_given->print(tab_layers + 1);
       sub_complement->print(tab_layers + 1);
@@ -155,7 +163,7 @@ public:
   }
   
 private:
-  double prob;
+  double last_calculated_prob;
   bool prob_needs_update;
   config_node* sub_given;
   config_node* sub_complement;
@@ -166,7 +174,7 @@ private:
 
 //Member functions of the configuration space
 configuration_space::configuration_space() {
-  root_node = new config_node(NULL, 1.0, event(1, 0));
+  root_node = new config_node(NULL, 1.0, event(0, 1));
   fulcrum_node = root_node;
 }
 
@@ -196,15 +204,21 @@ event configuration_space::next_event() const {
   return fulcrum_node->sub_event();
 }
 
-void configuration_space::predict(unsigned max_events, double predict_time_limit, function<completion_set(pattern)> get_first_order_completions) {
+bool configuration_space::next_event_ready() const {
+  return fulcrum_node->expanded();
+}
+
+void configuration_space::predict(unsigned max_events, double predict_time_limit, function<completion_set(const pattern&)> get_first_order_completions) {
   for(unsigned i=0;i<max_events;i++) { //FIXME: Insert timing code.
-    config_node* best_node = root.highest_probability_leaf_node();
+    config_node* best_node = root_node->highest_probability_leaf_node();
     completion_set cmp = get_first_order_completions(best_node->givens());
     best_node->expand(cmp.t_offset, cmp.event_prob, cmp.complement_prob);
   }
 }
 
-
+void configuration_space::display_contents() {
+  root_node->print();
+}
 
 
 
